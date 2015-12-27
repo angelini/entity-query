@@ -2,13 +2,13 @@ use regex::Regex;
 use data::Datum;
 
 #[derive(Debug)]
-pub enum ASTNode<'a> {
+pub enum ASTNode {
     True,
-    Or(Box<ASTNode<'a>>, Box<ASTNode<'a>>),
+    Or(Box<ASTNode>, Box<ASTNode>),
     Expression {
         e: Option<u32>,
-        a: Option<&'a str>,
-        v: Option<&'a str>,
+        a: Option<String>,
+        v: Option<String>,
         t: Option<u32>,
     },
 }
@@ -19,7 +19,7 @@ pub enum ParseError<'a> {
     InvalidPredicate(&'a str),
 }
 
-impl<'a> ASTNode<'a> {
+impl ASTNode {
     pub fn parse(query: &str) -> Result<ASTNode, ParseError> {
         let or_re = Regex::new(r"^(.*)\|(.*)$").unwrap();
         let true_re = Regex::new(r"^\s*$").unwrap();
@@ -44,11 +44,18 @@ impl<'a> ASTNode<'a> {
     pub fn eval(&self, datum: &Datum) -> bool {
         match self {
             &ASTNode::True => true,
-            &ASTNode::Expression { e, a, v, t } => {
+            &ASTNode::Expression { e, ref a, ref v, t } => {
                 let e_test = e.or(Some(datum.e)) == Some(datum.e);
-                let a_test = datum.a.contains(a.or(Some(datum.a)).unwrap());
-                let v_test = datum.v.contains(v.or(Some(datum.v)).unwrap());
                 let t_test = t.or(Some(datum.t)) == Some(datum.t);
+                let a_test = match a {
+                    &Some(ref a) => datum.a.contains(a),
+                    &None => true,
+                };
+                let v_test = match v {
+                    &Some(ref v) => datum.v.contains(v),
+                    &None => true,
+                };
+
                 e_test && a_test && v_test && t_test
             }
             &ASTNode::Or(ref l, ref r) => l.eval(datum) || r.eval(datum),
@@ -75,8 +82,8 @@ impl<'a> ASTNode<'a> {
                     ASTNode::Expression { e, a, v, t } => {
                         ASTNode::Expression {
                             e: if prefix == "e:" { Some(val.parse::<u32>().unwrap()) } else { e },
-                            a: if prefix == "a:" { Some(val) } else { a },
-                            v: if prefix == "v:" { Some(val) } else { v },
+                            a: if prefix == "a:" { Some(val.to_string()) } else { a },
+                            v: if prefix == "v:" { Some(val.to_string()) } else { v },
                             t: if prefix == "t:" { Some(val.parse::<u32>().unwrap()) } else { t },
                         }
                     }

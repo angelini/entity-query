@@ -26,7 +26,7 @@ pub fn read<'a>() -> Result<CLICommand, ParseError> {
         Err(_) => return Err(ParseError::IOError),
     };
     let command = &input[..2];
-    let args = input.chars().skip(2).collect();
+    let args = input.chars().skip(2).filter(|c| *c != '\n').collect();
 
     if command == "l " {
         Ok(CLICommand::Load(args))
