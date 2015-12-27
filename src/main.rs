@@ -47,21 +47,23 @@ fn convert_csv(entity: &str, filename: &str, time: &str) -> DB {
 }
 
 fn main() {
-    let mut db = convert_csv("gdp", "gdp.csv", "Year");
+    // let mut db = convert_csv("gdp", "data/gdp.csv", "Year");
     // let mut db = DB::from_vec(vec![]);
-    println!("db {:?}", db.datums.iter().take(5).collect::<Vec<&Datum>>());
+    let mut db = DB::from_file("data/gdp.db");
+    // println!("db: {:?}", db.datums.iter().take(5).collect::<Vec<&Datum>>());
+    println!("{}", db);
 
     loop {
         match cli::read() {
             Ok(CLICommand::Query(query)) => {
                 match ASTNode::parse(&query) {
-                    Ok(ast) => println!("{:?}", db.filter(|d| ast.eval(d))),
+                    Ok(ast) => println!("{}", db.filter(|d| ast.eval(d))),
                     Err(e) => println!("err: {:?}", e),
                 };
             }
             Ok(CLICommand::Load(filename)) => {
                 db = DB::from_file(&filename);
-                println!("db {:?}", db)
+                println!("{}", db)
             }
             Err(e) => println!("{:?}", e),
         }

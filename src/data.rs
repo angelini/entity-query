@@ -1,6 +1,7 @@
 extern crate rustc_serialize;
 extern crate bincode;
 
+use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, BufReader};
 use bincode::SizeLimit;
@@ -15,6 +16,7 @@ pub struct Datum {
 }
 
 impl Datum {
+    #[allow(dead_code)]
     pub fn new(e: u32, a: String, v: String, t: u32) -> Datum {
         Datum {
             e: e,
@@ -22,6 +24,12 @@ impl Datum {
             v: v,
             t: t,
         }
+    }
+}
+
+impl fmt::Display for Datum {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {}, {}, {})", self.e, self.a, self.v, self.t)
     }
 }
 
@@ -36,10 +44,12 @@ pub struct DBView<'a> {
 }
 
 impl DB {
+    #[allow(dead_code)]
     pub fn new(datums: Vec<Datum>) -> DB {
         DB { datums: datums }
     }
 
+    #[allow(dead_code)]
     pub fn from_vec(datums: Vec<(u32, &str, &str, u32)>) -> DB {
         DB {
             datums: datums.iter()
@@ -59,8 +69,37 @@ impl DB {
         DBView { datums: self.datums.iter().filter(|d| predicate(d)).collect::<Vec<&Datum>>() }
     }
 
+    #[allow(dead_code)]
     pub fn write(&self, filename: &str) -> EncodingResult<()> {
         let mut file = BufWriter::new(File::create(filename).unwrap());
         bincode::rustc_serialize::encode_into(self, &mut file, SizeLimit::Infinite)
+    }
+}
+
+impl fmt::Display for DB {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (idx, datum) in self.datums.iter().enumerate().take(5) {
+            try!(write!(f, "{}", datum));
+            try!(write!(f, "\n"));
+            if idx == 4 {
+                try!(write!(f, "..."));
+            }
+        };
+        Ok(())
+    }
+}
+
+impl<'a> fmt::Display for DBView<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (idx, datum) in self.datums.iter().enumerate().take(5) {
+            try!(write!(f, "{}", datum));
+            if idx < self.datums.len() - 1 {
+                try!(write!(f, "\n"));
+            }
+            if idx == 4 {
+                try!(write!(f, "..."));
+            }
+        };
+        Ok(())
     }
 }
