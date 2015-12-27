@@ -27,10 +27,19 @@ impl Datum {
 
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable, PartialEq)]
 pub struct DB {
-    datums: Vec<Datum>,
+    pub datums: Vec<Datum>,
+}
+
+#[derive(Debug)]
+pub struct DBView<'a> {
+    datums: Vec<&'a Datum>,
 }
 
 impl DB {
+    pub fn new(datums: Vec<Datum>) -> DB {
+        DB { datums: datums }
+    }
+
     pub fn from_vec(datums: Vec<(u32, &str, &str, u32)>) -> DB {
         DB {
             datums: datums.iter()
@@ -44,10 +53,10 @@ impl DB {
         bincode::rustc_serialize::decode_from(&mut reader, SizeLimit::Infinite).unwrap()
     }
 
-    pub fn filter<F>(self, predicate: F) -> DB
+    pub fn filter<'a, F>(&'a self, predicate: F) -> DBView<'a>
         where F: Fn(&Datum) -> bool
     {
-        DB { datums: self.datums.into_iter().filter(|d| predicate(d)).collect::<Vec<Datum>>() }
+        DBView { datums: self.datums.iter().filter(|d| predicate(d)).collect::<Vec<&Datum>>() }
     }
 
     pub fn write(&self, filename: &str) -> EncodingResult<()> {

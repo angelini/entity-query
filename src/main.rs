@@ -18,8 +18,8 @@ fn main() {
         match cli::read() {
             Ok(CLICommand::Query(query)) => {
                 match ASTNode::parse(&query) {
-                    Ok(ast) => println!("{:?}", db.clone().filter(|d| ast.eval(&d))),
-                    Err(e) => panic!("query: {:?}\nerr: {:?}", query, e),
+                    Ok(ast) => println!("{:?}", db.filter(|d| ast.eval(d))),
+                    Err(e) => println!("err: {:?}", e),
                 };
             }
             Ok(CLICommand::Load(filename)) => {
