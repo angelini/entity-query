@@ -1,4 +1,4 @@
-use std::io;
+use linenoise;
 
 #[derive(Debug)]
 pub enum CLICommand {
@@ -6,28 +6,23 @@ pub enum CLICommand {
     LoadCSV(String, String, String),
     Query(String),
     Write(String),
+    Empty,
 }
 
 #[derive(Debug)]
 pub enum ParseError {
-    IOError,
     InvalidCommand(String),
     InvalidArgs(String),
 }
 
-fn read_input() -> Result<String, io::Error> {
-    let mut input = String::new();
-    match io::stdin().read_line(&mut input) {
-        Ok(_) => Ok(input),
-        Err(e) => Err(e),
-    }
-}
-
 pub fn read<'a>() -> Result<CLICommand, ParseError> {
-    let input = match read_input() {
-        Ok(input) => input,
-        Err(_) => return Err(ParseError::IOError),
+    let input = match linenoise::input("> ") {
+        Some(i) => i,
+        None => return Ok(CLICommand::Empty),
     };
+
+    linenoise::history_add(&input);
+
     let command = &input[..2];
     let args = input.chars().skip(2).filter(|c| *c != '\n').collect::<String>();
     let args_split = args.split(" ").collect::<Vec<&str>>();

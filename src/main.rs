@@ -2,6 +2,7 @@ extern crate regex;
 extern crate rustc_serialize;
 extern crate bincode;
 extern crate csv;
+extern crate linenoise;
 
 mod data;
 mod ast;
@@ -34,7 +35,8 @@ fn main() {
             Ok(CLICommand::Write(filename)) => {
                 let res = db.write(&filename);
                 println!("res: {:?}", res)
-            }
+            },
+            Ok(CLICommand::Empty) => break,
             Err(e) => println!("{:?}", e),
         }
     }
