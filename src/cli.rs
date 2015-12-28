@@ -7,6 +7,7 @@ pub enum CLICommand {
     Query(String),
     Write(String),
     Empty,
+    Exit,
 }
 
 #[derive(Debug)]
@@ -23,23 +24,33 @@ pub fn read<'a>() -> Result<CLICommand, ParseError> {
 
     linenoise::history_add(&input);
 
-    let command = &input[..2];
-    let args = input.chars().skip(2).filter(|c| *c != '\n').collect::<String>();
-    let args_split = args.split(" ").collect::<Vec<&str>>();
+    if input == "" {
+        return Ok(CLICommand::Empty);
+    }
+
+    let split = input.split(" ").collect::<Vec<&str>>();
+    let command = split[0];
+    let args = split.into_iter().skip(1).collect::<Vec<&str>>();
+    let all_args = args.join(" ");
 
     match command {
-        "l " => Ok(CLICommand::Load(args_split.join(" "))),
-        "c " => {
-            if args_split.len() == 3 {
-                Ok(CLICommand::LoadCSV((*args_split.get(0).unwrap()).to_string(),
-                                       (*args_split.get(1).unwrap()).to_string(),
-                                       (*args_split.get(2).unwrap()).to_string()))
+        "l" => Ok(CLICommand::Load(all_args)),
+        "c" => {
+            if args.len() == 3 {
+                Ok(CLICommand::LoadCSV((*args.get(0).unwrap()).to_string(),
+                                       (*args.get(1).unwrap()).to_string(),
+                                       (*args.get(2).unwrap()).to_string()))
             } else {
-                Err(ParseError::InvalidArgs(args_split.join(" ")))
+                Err(ParseError::InvalidArgs(all_args))
             }
         }
-        "q " => Ok(CLICommand::Query(args_split.join(" "))),
-        "w " => Ok(CLICommand::Write(args_split.join(" "))),
+        "q" => Ok(CLICommand::Query(all_args)),
+        "w" => Ok(CLICommand::Write(all_args)),
+        "clear" => {
+            linenoise::clear_screen();
+            Ok(CLICommand::Empty)
+        }
+        "exit" => Ok(CLICommand::Exit),
         _ => Err(ParseError::InvalidCommand(command.to_string())),
     }
 }

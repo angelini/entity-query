@@ -8,6 +8,7 @@ mod data;
 mod ast;
 mod cli;
 
+use std::process;
 use data::DB;
 use ast::ASTNode;
 use cli::CLICommand;
@@ -35,8 +36,9 @@ fn main() {
             Ok(CLICommand::Write(filename)) => {
                 let res = db.write(&filename);
                 println!("res: {:?}", res)
-            },
-            Ok(CLICommand::Empty) => break,
+            }
+            Ok(CLICommand::Empty) => continue,
+            Ok(CLICommand::Exit) => process::exit(0),
             Err(e) => println!("{:?}", e),
         }
     }
