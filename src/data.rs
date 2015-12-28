@@ -1,12 +1,13 @@
-extern crate rustc_serialize;
-extern crate bincode;
-
 use csv;
 use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, BufReader};
+use bincode;
 use bincode::SizeLimit;
 use bincode::rustc_serialize as serialize;
+use flate2::write::ZlibEncoder;
+use flate2::read::ZlibDecoder;
+use flate2::Compression;
 
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable, PartialEq)]
 pub struct Datum {
@@ -70,9 +71,10 @@ impl DB {
             Ok(f) => f,
             Err(_) => return Err(LoadError::FileMissing(filename.to_string())),
         };
-        let mut reader = BufReader::new(file);
+        let reader = BufReader::new(file);
+        let mut decoder = ZlibDecoder::new(reader);
         let decoded: Result<DB, serialize::DecodingError> =
-            serialize::decode_from(&mut reader, SizeLimit::Infinite);
+            serialize::decode_from(&mut decoder, SizeLimit::Infinite);
 
         match decoded {
             Ok(db) => Ok(db),
@@ -123,24 +125,25 @@ impl DB {
     }
 
     pub fn write(&self, filename: &str) -> serialize::EncodingResult<()> {
-        let mut file = BufWriter::new(File::create(filename).unwrap());
-        bincode::rustc_serialize::encode_into(self, &mut file, SizeLimit::Infinite)
+        let writer = BufWriter::new(File::create(filename).unwrap());
+        let mut encoder = ZlibEncoder::new(writer, Compression::Fast);
+        bincode::rustc_serialize::encode_into(self, &mut encoder, SizeLimit::Infinite)
     }
 }
 
 impl fmt::Display for DB {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write_datums(&self.datums.iter().collect(), f)
+        display_datums(&self.datums.iter().collect(), f)
     }
 }
 
 impl<'a> fmt::Display for DBView<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write_datums(&self.datums, f)
+        display_datums(&self.datums, f)
     }
 }
 
-fn write_datums(datums: &Vec<&Datum>, f: &mut fmt::Formatter) -> fmt::Result {
+fn display_datums(datums: &Vec<&Datum>, f: &mut fmt::Formatter) -> fmt::Result {
     if datums.len() == 0 {
         try!(write!(f, "[]"))
     }
