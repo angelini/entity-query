@@ -5,6 +5,7 @@ extern crate csv;
 extern crate linenoise;
 extern crate flate2;
 extern crate time;
+extern crate scoped_threadpool;
 
 mod data;
 mod ast;
@@ -24,9 +25,9 @@ fn main() {
                 match ASTNode::parse(&query) {
                     Ok(ast) => {
                         let start = time::precise_time_s();
-                        let res = db.filter(|d| ast.eval(d));
+                        let res = db.filter(&ast);
                         println!("duration {}", time::precise_time_s() - start);
-                        println!("len {}", db.datums.len());
+                        println!("len {}", res.datums.len());
                         println!("{}", res)
                     }
                     Err(e) => println!("{:?}", e),

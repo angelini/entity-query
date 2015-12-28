@@ -1,7 +1,7 @@
 use regex::Regex;
 use data::Datum;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ASTNode {
     True,
     Or(Box<ASTNode>, Box<ASTNode>),
