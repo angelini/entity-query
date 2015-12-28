@@ -1,11 +1,12 @@
 extern crate rustc_serialize;
 extern crate bincode;
 
+use csv;
 use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, BufReader};
 use bincode::SizeLimit;
-use bincode::rustc_serialize::EncodingResult;
+use bincode::rustc_serialize as serialize;
 
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable, PartialEq)]
 pub struct Datum {
@@ -43,6 +44,12 @@ pub struct DBView<'a> {
     datums: Vec<&'a Datum>,
 }
 
+#[derive(Debug)]
+pub enum LoadError {
+    FileMissing(String),
+    InvalidInput(String),
+}
+
 impl DB {
     #[allow(dead_code)]
     pub fn new(datums: Vec<Datum>) -> DB {
@@ -58,9 +65,55 @@ impl DB {
         }
     }
 
-    pub fn from_file(filename: &str) -> DB {
-        let mut reader = BufReader::new(File::open(filename).unwrap());
-        bincode::rustc_serialize::decode_from(&mut reader, SizeLimit::Infinite).unwrap()
+    pub fn from_file<'a>(filename: &'a str) -> Result<DB, LoadError> {
+        let file = match File::open(filename) {
+            Ok(f) => f,
+            Err(_) => return Err(LoadError::FileMissing(filename.to_string())),
+        };
+        let mut reader = BufReader::new(file);
+        let decoded: Result<DB, serialize::DecodingError> =
+            serialize::decode_from(&mut reader, SizeLimit::Infinite);
+
+        match decoded {
+            Ok(db) => Ok(db),
+            Err(e) => Err(LoadError::InvalidInput(format!("file: {}\nerr: {}", filename, e))),
+        }
+    }
+
+    pub fn from_csv<'a>(entity: &str, filename: &str, time: &str) -> Result<DB, LoadError> {
+        let mut rdr = match csv::Reader::from_file(filename) {
+            Ok(rdr) => rdr,
+            Err(e) => {
+                return Err(LoadError::InvalidInput(format!("file: {}\nerr: {}", filename, e)))
+            }
+        };
+        let headers = rdr.headers().expect("Headers required to convert CSV");
+
+        let time_index = match headers.iter().enumerate().find(|&(_, h)| h == time) {
+            Some((idx, _)) => idx,
+            None => return Err(LoadError::InvalidInput(format!("time header not found: {}", time))),
+        };
+
+        let mut eid = 0;
+        let datums = rdr.records()
+                        .flat_map(|row_res| {
+                            let row = row_res.unwrap();
+                            let time_val = row[time_index].parse::<u32>().unwrap();
+
+                            eid += 1;
+                            headers.iter()
+                                   .zip(row)
+                                   .map(|(header, val)| {
+                                       Datum::new(eid,
+                                                  format!("{}/{}", entity, robotize(header)),
+                                                  val,
+                                                  time_val)
+                                   })
+                                   .collect::<Vec<Datum>>()
+                        })
+                        .collect::<Vec<Datum>>();
+
+        Ok(DB::new(datums))
     }
 
     pub fn filter<'a, F>(&'a self, predicate: F) -> DBView<'a>
@@ -69,8 +122,7 @@ impl DB {
         DBView { datums: self.datums.iter().filter(|d| predicate(d)).collect::<Vec<&Datum>>() }
     }
 
-    #[allow(dead_code)]
-    pub fn write(&self, filename: &str) -> EncodingResult<()> {
+    pub fn write(&self, filename: &str) -> serialize::EncodingResult<()> {
         let mut file = BufWriter::new(File::create(filename).unwrap());
         bincode::rustc_serialize::encode_into(self, &mut file, SizeLimit::Infinite)
     }
@@ -78,28 +130,34 @@ impl DB {
 
 impl fmt::Display for DB {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (idx, datum) in self.datums.iter().enumerate().take(5) {
-            try!(write!(f, "{}", datum));
-            try!(write!(f, "\n"));
-            if idx == 4 {
-                try!(write!(f, "..."));
-            }
-        };
-        Ok(())
+        write_datums(&self.datums.iter().collect(), f)
     }
 }
 
 impl<'a> fmt::Display for DBView<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (idx, datum) in self.datums.iter().enumerate().take(5) {
-            try!(write!(f, "{}", datum));
-            if idx < self.datums.len() - 1 {
-                try!(write!(f, "\n"));
-            }
-            if idx == 4 {
-                try!(write!(f, "..."));
-            }
-        };
-        Ok(())
+        write_datums(&self.datums, f)
     }
+}
+
+fn write_datums(datums: &Vec<&Datum>, f: &mut fmt::Formatter) -> fmt::Result {
+    if datums.len() == 0 {
+        try!(write!(f, "[]"))
+    }
+
+    for (idx, datum) in datums.iter().enumerate().take(5) {
+        try!(write!(f, "{}", datum));
+        if idx < datums.len() - 1 {
+            try!(write!(f, "\n"));
+        }
+        if idx == 4 {
+            try!(write!(f, "..."));
+        }
+    }
+    Ok(())
+}
+
+fn robotize(string: &str) -> String {
+    string.replace(" ", "_")
+          .to_lowercase()
 }
