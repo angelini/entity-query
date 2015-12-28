@@ -1,5 +1,6 @@
 use csv;
 use std::fmt;
+use std::path;
 use std::fs::File;
 use std::io::{BufWriter, BufReader};
 use bincode;
@@ -51,6 +52,12 @@ pub enum LoadError {
     InvalidInput(String),
 }
 
+#[derive(Debug)]
+pub enum WriteError {
+    FileExists(String),
+    EncodingError(String),
+}
+
 impl DB {
     #[allow(dead_code)]
     pub fn new(datums: Vec<Datum>) -> DB {
@@ -78,7 +85,7 @@ impl DB {
 
         match decoded {
             Ok(db) => Ok(db),
-            Err(e) => Err(LoadError::InvalidInput(format!("file: {}\nerr: {}", filename, e))),
+            Err(e) => Err(LoadError::InvalidInput(format!("file: {}, err: {}", filename, e))),
         }
     }
 
@@ -86,7 +93,7 @@ impl DB {
         let mut rdr = match csv::Reader::from_file(filename) {
             Ok(rdr) => rdr,
             Err(e) => {
-                return Err(LoadError::InvalidInput(format!("file: {}\nerr: {}", filename, e)))
+                return Err(LoadError::InvalidInput(format!("file: {}, err: {}", filename, e)))
             }
         };
         let headers = rdr.headers().expect("Headers required to convert CSV");
@@ -124,10 +131,19 @@ impl DB {
         DBView { datums: self.datums.iter().filter(|d| predicate(d)).collect::<Vec<&Datum>>() }
     }
 
-    pub fn write(&self, filename: &str) -> serialize::EncodingResult<()> {
-        let writer = BufWriter::new(File::create(filename).unwrap());
+    pub fn write(&self, filename: &str) -> Result<(), WriteError> {
+        let path = path::Path::new(filename);
+        if path.exists() {
+            return Err(WriteError::FileExists(filename.to_string()))
+        }
+
+        let writer = BufWriter::new(File::create(path).unwrap());
         let mut encoder = ZlibEncoder::new(writer, Compression::Fast);
-        bincode::rustc_serialize::encode_into(self, &mut encoder, SizeLimit::Infinite)
+
+        match bincode::rustc_serialize::encode_into(self, &mut encoder, SizeLimit::Infinite) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(WriteError::EncodingError(format!("file: {}, err: {}", filename, e))),
+        }
     }
 }
 

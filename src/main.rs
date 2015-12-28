@@ -29,26 +29,38 @@ fn main() {
                         println!("len {}", db.datums.len());
                         println!("{}", res)
                     }
-                    Err(e) => println!("err: {:?}", e),
+                    Err(e) => println!("{:?}", e),
                 };
             }
             Ok(CLICommand::Load(filename)) => {
                 let start = time::precise_time_s();
-                db = DB::from_file(&filename).unwrap();
-                println!("duration {}", time::precise_time_s() - start);
-                println!("len {}", db.datums.len());
-                println!("{}", db)
+                match DB::from_file(&filename) {
+                    Ok(d) => {
+                        db = d;
+                        println!("duration {}", time::precise_time_s() - start);
+                        println!("len {}", db.datums.len());
+                        println!("{}", db)
+                    }
+                    Err(e) => println!("{:?}", e),
+                }
             }
             Ok(CLICommand::LoadCSV(filename, entity, time)) => {
                 let start = time::precise_time_s();
-                db = DB::from_csv(&entity, &filename, &time).unwrap();
-                println!("duration {}", time::precise_time_s() - start);
-                println!("len {}", db.datums.len());
-                println!("{}", db)
+                match DB::from_csv(&entity, &filename, &time) {
+                    Ok(d) => {
+                        db = d;
+                        println!("duration {}", time::precise_time_s() - start);
+                        println!("len {}", db.datums.len());
+                        println!("{}", db)
+                    }
+                    Err(e) => println!("{:?}", e),
+                }
             }
             Ok(CLICommand::Write(filename)) => {
-                let res = db.write(&filename);
-                println!("res: {:?}", res)
+                match db.write(&filename) {
+                    Ok(_) => println!("wrote: {}", filename),
+                    Err(e) => println!("{:?}", e),
+                }
             }
             Ok(CLICommand::Empty) => continue,
             Ok(CLICommand::Exit) => process::exit(0),
