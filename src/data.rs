@@ -143,27 +143,27 @@ impl DB {
 
 impl fmt::Display for DB {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        display_datums(&self.datums.iter().collect(), f)
+        display_datums(&self.datums.iter().collect(), f, 20)
     }
 }
 
 impl<'a> fmt::Display for DBView<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        display_datums(&self.datums, f)
+        display_datums(&self.datums, f, 20)
     }
 }
 
-fn display_datums(datums: &Vec<&Datum>, f: &mut fmt::Formatter) -> fmt::Result {
+fn display_datums(datums: &Vec<&Datum>, f: &mut fmt::Formatter, size: usize) -> fmt::Result {
     if datums.len() == 0 {
         try!(write!(f, "[]"))
     }
 
-    for (idx, datum) in datums.iter().enumerate().take(5) {
+    for (idx, datum) in datums.iter().enumerate().take(size) {
         try!(write!(f, "{}", datum));
         if idx < datums.len() - 1 {
             try!(write!(f, "\n"));
         }
-        if idx == 4 {
+        if idx == size - 1 {
             try!(write!(f, "..."));
         }
     }
