@@ -47,9 +47,10 @@ fn main() {
             }
             Ok(CLICommand::Load(filename)) => {
                 let start = time::precise_time_s();
+                db = DB::new(); // de-alloc the old DB
                 match DB::from_file(&filename) {
                     Ok(d) => {
-                        db.datums.extend(d.datums);
+                        db = d;
                         println!("duration {}", time::precise_time_s() - start);
                         println!("len {}", db.datums.len());
                         println!("{}", db)
