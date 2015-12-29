@@ -19,6 +19,8 @@ use cli::CLICommand;
 use filter::Filter;
 
 fn main() {
+    linenoise::history_set_max_len(1000);
+    linenoise::history_load(".history");
     let mut db = DB::from_vec(vec![]);
 
     loop {

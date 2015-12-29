@@ -22,6 +22,8 @@ pub fn read<'a>() -> Result<CLICommand, ParseError> {
         None => return Ok(CLICommand::Empty),
     };
 
+    // Save before adding to the history to avoid saving the last "exit"
+    linenoise::history_save(".history");
     linenoise::history_add(&input);
 
     if input == "" {
