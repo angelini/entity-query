@@ -19,7 +19,6 @@ pub struct Datum {
 }
 
 impl Datum {
-    #[allow(dead_code)]
     pub fn new(e: u32, a: String, v: String, t: u32) -> Datum {
         Datum {
             e: e,
@@ -39,6 +38,7 @@ impl fmt::Display for Datum {
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable, PartialEq)]
 pub struct DB {
     pub datums: Vec<Datum>,
+    offset: u32,
 }
 
 #[derive(Debug)]
@@ -59,17 +59,10 @@ pub enum WriteError {
 }
 
 impl DB {
-    #[allow(dead_code)]
-    pub fn new(datums: Vec<Datum>) -> DB {
-        DB { datums: datums }
-    }
-
-    #[allow(dead_code)]
-    pub fn from_vec(datums: Vec<(u32, &str, &str, u32)>) -> DB {
+    pub fn new() -> DB {
         DB {
-            datums: datums.iter()
-                          .map(|t| Datum::new(t.0, t.1.to_string(), t.2.to_string(), t.3))
-                          .collect::<Vec<Datum>>(),
+            datums: vec![],
+            offset: 0,
         }
     }
 
@@ -89,7 +82,11 @@ impl DB {
         }
     }
 
-    pub fn from_csv<'a>(entity: &str, filename: &str, time: &str) -> Result<DB, LoadError> {
+    pub fn from_csv<'a>(&mut self,
+                        entity: &str,
+                        filename: &str,
+                        time: &str)
+                        -> Result<(), LoadError> {
         let mut rdr = match csv::Reader::from_file(filename) {
             Ok(rdr) => rdr,
             Err(e) => {
@@ -103,26 +100,28 @@ impl DB {
             None => return Err(LoadError::InvalidInput(format!("time header not found: {}", time))),
         };
 
-        let mut eid = 0;
-        let datums = rdr.records()
-                        .flat_map(|row_res| {
-                            let row = row_res.unwrap();
-                            let time_val = row[time_index].parse::<u32>().unwrap();
+        let mut eid = self.offset;
+        let new_datums = rdr.records()
+                            .flat_map(|row_res| {
+                                let row = row_res.unwrap();
+                                let time_val = row[time_index].parse::<u32>().unwrap();
 
-                            eid += 1;
-                            headers.iter()
-                                   .zip(row)
-                                   .map(|(header, val)| {
-                                       Datum::new(eid,
-                                                  format!("{}/{}", entity, robotize(header)),
-                                                  val,
-                                                  time_val)
-                                   })
-                                   .collect::<Vec<Datum>>()
-                        })
-                        .collect::<Vec<Datum>>();
+                                eid += 1;
+                                headers.iter()
+                                       .zip(row)
+                                       .map(|(header, val)| {
+                                           Datum::new(eid,
+                                                      format!("{}/{}", entity, robotize(header)),
+                                                      val,
+                                                      time_val)
+                                       })
+                                       .collect::<Vec<Datum>>()
+                            })
+                            .collect::<Vec<Datum>>();
 
-        Ok(DB::new(datums))
+        self.offset = eid;
+        self.datums.extend(new_datums);
+        Ok(())
     }
 
     pub fn write(&self, filename: &str) -> Result<(), WriteError> {

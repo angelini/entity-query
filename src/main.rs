@@ -21,7 +21,7 @@ use filter::Filter;
 fn main() {
     linenoise::history_set_max_len(1000);
     linenoise::history_load(".history");
-    let mut db = DB::from_vec(vec![]);
+    let mut db = DB::new();
 
     loop {
         match cli::read() {
@@ -50,12 +50,12 @@ fn main() {
                 }
             }
             Ok(CLICommand::LoadCSV(filename, entity, time)) => {
+                let size = db.datums.len();
                 let start = time::precise_time_s();
-                match DB::from_csv(&entity, &filename, &time) {
-                    Ok(d) => {
-                        db.datums.extend(d.datums);
+                match db.from_csv(&entity, &filename, &time) {
+                    Ok(_) => {
                         println!("duration {}", time::precise_time_s() - start);
-                        println!("len {}", db.datums.len());
+                        println!("new {}", db.datums.len() - size);
                         println!("{}", db)
                     }
                     Err(e) => println!("{:?}", e),
@@ -67,7 +67,7 @@ fn main() {
                     Err(e) => println!("{:?}", e),
                 }
             }
-            Ok(CLICommand::Empty) => db = DB::from_vec(vec![]),
+            Ok(CLICommand::Empty) => db = DB::new(),
             Ok(CLICommand::None) => continue,
             Ok(CLICommand::Exit) => process::exit(0),
             Err(e) => println!("{:?}", e),
