@@ -7,6 +7,7 @@ pub enum CLICommand {
     Query(String),
     Write(String),
     Empty,
+    None,
     Exit,
 }
 
@@ -19,7 +20,7 @@ pub enum ParseError {
 pub fn read<'a>() -> Result<CLICommand, ParseError> {
     let input = match linenoise::input("> ") {
         Some(i) => i,
-        None => return Ok(CLICommand::Empty),
+        None => return Ok(CLICommand::None),
     };
 
     // Save before adding to the history to avoid saving the last "exit"
@@ -27,7 +28,7 @@ pub fn read<'a>() -> Result<CLICommand, ParseError> {
     linenoise::history_add(&input);
 
     if input == "" {
-        return Ok(CLICommand::Empty);
+        return Ok(CLICommand::None);
     }
 
     let split = input.split(" ").collect::<Vec<&str>>();
@@ -48,9 +49,10 @@ pub fn read<'a>() -> Result<CLICommand, ParseError> {
         }
         "q" => Ok(CLICommand::Query(all_args)),
         "w" => Ok(CLICommand::Write(all_args)),
+        "empty" => Ok(CLICommand::Empty),
         "clear" => {
             linenoise::clear_screen();
-            Ok(CLICommand::Empty)
+            Ok(CLICommand::None)
         }
         "exit" => Ok(CLICommand::Exit),
         _ => Err(ParseError::InvalidCommand(command.to_string())),

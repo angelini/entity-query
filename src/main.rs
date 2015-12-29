@@ -41,7 +41,7 @@ fn main() {
                 let start = time::precise_time_s();
                 match DB::from_file(&filename) {
                     Ok(d) => {
-                        db = d;
+                        db.datums.extend(d.datums);
                         println!("duration {}", time::precise_time_s() - start);
                         println!("len {}", db.datums.len());
                         println!("{}", db)
@@ -53,7 +53,7 @@ fn main() {
                 let start = time::precise_time_s();
                 match DB::from_csv(&entity, &filename, &time) {
                     Ok(d) => {
-                        db = d;
+                        db.datums.extend(d.datums);
                         println!("duration {}", time::precise_time_s() - start);
                         println!("len {}", db.datums.len());
                         println!("{}", db)
@@ -67,7 +67,8 @@ fn main() {
                     Err(e) => println!("{:?}", e),
                 }
             }
-            Ok(CLICommand::Empty) => continue,
+            Ok(CLICommand::Empty) => db = DB::from_vec(vec![]),
+            Ok(CLICommand::None) => continue,
             Ok(CLICommand::Exit) => process::exit(0),
             Err(e) => println!("{:?}", e),
         }
