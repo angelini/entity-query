@@ -3,16 +3,12 @@ use std::fmt;
 use std::path;
 use std::fs::File;
 use std::io::{BufWriter, BufReader};
-use std::sync::mpsc;
 use bincode;
 use bincode::SizeLimit;
 use bincode::rustc_serialize as serialize;
 use flate2::write::ZlibEncoder;
 use flate2::read::ZlibDecoder;
 use flate2::Compression;
-use scoped_threadpool::Pool;
-
-use ast::ASTNode;
 
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable, PartialEq)]
 pub struct Datum {
@@ -129,45 +125,10 @@ impl DB {
         Ok(DB::new(datums))
     }
 
-    pub fn filter<'a>(&'a self, ast: &ASTNode) -> DBView<'a> {
-        let threads = 12;
-        let size = self.datums.len() / threads;
-        let (tx, rx) = mpsc::channel();
-
-        let mut pool = Pool::new(threads as u32);
-
-        pool.scoped(|scoped| {
-            for i in 0..threads {
-                let start = i * size;
-                let stop = if i == (threads - 1) {
-                    self.datums.len()
-                } else {
-                    i * size + size
-                };
-
-                let thread_tx = tx.clone();
-                let thread_ast = ast.clone();
-                let slice: &'a [Datum] = &self.datums[start..stop];
-
-                scoped.execute(move || {
-                    let results = slice.iter().filter(|d| thread_ast.eval(d)).collect::<Vec<&Datum>>();
-                    thread_tx.send(results).unwrap();
-                })
-            }
-        });
-
-        let mut results = vec!();
-        for _ in 0..threads {
-            results.extend(rx.recv().unwrap())
-        }
-
-        DBView { datums: results }
-    }
-
     pub fn write(&self, filename: &str) -> Result<(), WriteError> {
         let path = path::Path::new(filename);
         if path.exists() {
-            return Err(WriteError::FileExists(filename.to_string()))
+            return Err(WriteError::FileExists(filename.to_string()));
         }
 
         let writer = BufWriter::new(File::create(path).unwrap());

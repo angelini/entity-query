@@ -10,11 +10,13 @@ extern crate scoped_threadpool;
 mod data;
 mod ast;
 mod cli;
+mod filter;
 
 use std::process;
 use data::DB;
 use ast::ASTNode;
 use cli::CLICommand;
+use filter::Filter;
 
 fn main() {
     let mut db = DB::from_vec(vec![]);
@@ -25,13 +27,13 @@ fn main() {
                 match ASTNode::parse(&query) {
                     Ok(ast) => {
                         let start = time::precise_time_s();
-                        let res = db.filter(&ast);
+                        let res = Filter::new(&db, &ast, 12).execute();
                         println!("duration {}", time::precise_time_s() - start);
                         println!("len {}", res.datums.len());
                         println!("{}", res)
                     }
                     Err(e) => println!("{:?}", e),
-                };
+                }
             }
             Ok(CLICommand::Load(filename)) => {
                 let start = time::precise_time_s();
