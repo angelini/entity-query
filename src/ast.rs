@@ -1,4 +1,3 @@
-use regex::Regex;
 use data::Datum;
 
 #[derive(Debug, Clone)]
@@ -21,8 +20,8 @@ pub enum ParseError<'a> {
 
 impl ASTNode {
     pub fn parse(query: &str) -> Result<ASTNode, ParseError> {
-        let or_re = Regex::new(r"^(.*)\|(.*)$").unwrap();
-        let true_re = Regex::new(r"^\s*$").unwrap();
+        let or_re = regex!(r"^(.*)\|(.*)$");
+        let true_re = regex!(r"^\s*$");
 
         if let Some(caps) = or_re.captures(query) {
             let left = Self::parse(caps.at(1).unwrap());
@@ -63,7 +62,7 @@ impl ASTNode {
     }
 
     fn parse_expression(query: &str) -> Result<ASTNode, ParseError> {
-        let exp_re = Regex::new(r"^[eavt]:\S+$").unwrap();
+        let exp_re = regex!(r"^[eavt]:\S+$");
         let mut exp = ASTNode::Expression {
             e: None,
             a: None,

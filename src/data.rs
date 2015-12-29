@@ -95,7 +95,9 @@ impl DB {
         };
         let headers = rdr.headers().expect("Headers required to convert CSV");
 
-        let time_index = match headers.iter().enumerate().find(|&(_, h)| h == time) {
+        let time_index = match headers.iter()
+                                      .enumerate()
+                                      .find(|&(_, h)| h == time) {
             Some((idx, _)) => idx,
             None => return Err(LoadError::InvalidInput(format!("time header not found: {}", time))),
         };
@@ -104,7 +106,9 @@ impl DB {
         let new_datums = rdr.records()
                             .flat_map(|row_res| {
                                 let row = row_res.unwrap();
-                                let time_val = row[time_index].parse::<u32>().unwrap();
+                                let time_val = row[time_index]
+                                                   .parse::<u32>()
+                                                   .unwrap();
 
                                 eid += 1;
                                 headers.iter()

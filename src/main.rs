@@ -1,3 +1,10 @@
+// http://carol-nichols.com/2015/12/09/rust-profiling-on-osx-cpu-time/
+// #![feature(alloc_system)]
+// extern crate alloc_system;
+
+#![feature(plugin)]
+#![plugin(regex_macros)]
+
 extern crate regex;
 extern crate rustc_serialize;
 extern crate bincode;
@@ -24,6 +31,7 @@ fn main() {
     let mut db = DB::new();
 
     loop {
+        println!("size: {}", db.datums.len());
         match cli::read() {
             Ok(CLICommand::Query(query)) => {
                 match ASTNode::parse(&query) {
