@@ -47,6 +47,9 @@ fn parse_row(row: Vec<String>, headers: &[String], time_index: usize, eid: u32, 
     };
     let mut eid = eid;
     let datums = headers.iter()
+                        .enumerate()
+                        .filter(|&(i, _)| i != time_index)
+                        .map(|(_, h)| h)
                         .zip(row)
                         .map(|(header, val)| {
                             eid += 1;
