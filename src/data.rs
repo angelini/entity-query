@@ -1,4 +1,3 @@
-use csv;
 use std::fmt;
 use std::path;
 use std::fs::File;
@@ -38,7 +37,7 @@ impl fmt::Display for Datum {
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable, PartialEq)]
 pub struct DB {
     pub datums: Vec<Datum>,
-    offset: u32,
+    pub offset: u32,
 }
 
 #[derive(Debug)]
@@ -82,47 +81,6 @@ impl DB {
         }
     }
 
-    pub fn extend_from_csv(&mut self, entity: &str, filename: &str, time: &str)
-                           -> Result<(), LoadError> {
-        let mut rdr = match csv::Reader::from_file(filename) {
-            Ok(rdr) => rdr,
-            Err(e) => {
-                return Err(LoadError::InvalidInput(format!("file: {}, err: {}", filename, e)))
-            }
-        };
-        let headers = rdr.headers().expect("headers required to convert CSV");
-
-        let time_index = match headers.iter()
-                                      .enumerate()
-                                      .find(|&(_, h)| h == time) {
-            Some((idx, _)) => idx,
-            None => return Err(LoadError::InvalidInput(format!("time header not found: {}", time))),
-        };
-
-        let mut eid = self.offset;
-        let new_datums = rdr.records()
-                            .map(|row_res| {
-                                let row = row_res.unwrap();
-                                let (offset, datums) = try!(Self::parse_row(row,
-                                                                            &headers,
-                                                                            time_index,
-                                                                            eid,
-                                                                            entity));
-                                eid = offset;
-                                Ok(datums)
-                            })
-                            .collect::<Result<Vec<Vec<Datum>>, LoadError>>();
-
-        match new_datums {
-            Ok(d) => {
-                self.offset = eid;
-                self.datums.extend(d.into_iter().flat_map(|v| v).collect::<Vec<Datum>>());
-                Ok(())
-            }
-            Err(e) => Err(e),
-        }
-    }
-
     pub fn write(&self, filename: &str) -> Result<(), WriteError> {
         let path = path::Path::new(filename);
         if path.exists() {
@@ -136,29 +94,6 @@ impl DB {
             Ok(_) => Ok(()),
             Err(e) => Err(WriteError::EncodingError(format!("file: {}, err: {}", filename, e))),
         }
-    }
-
-    fn parse_row(row: Vec<String>, headers: &[String], time_index: usize, eid: u32, entity: &str)
-                 -> Result<(u32, Vec<Datum>), LoadError> {
-        let time = match row[time_index].parse::<u32>() {
-            Ok(t) => t,
-            Err(_) => {
-                return Err(LoadError::InvalidInput(format!("time col is not an int: {}",
-                                                           row[time_index])))
-            }
-        };
-        let mut eid = eid;
-        let datums = headers.iter()
-                            .zip(row)
-                            .map(|(header, val)| {
-                                eid += 1;
-                                Datum::new(eid,
-                                           format!("{}/{}", entity, robotize(header)),
-                                           val,
-                                           time)
-                            })
-                            .collect();
-        Ok((eid, datums))
     }
 }
 
@@ -189,9 +124,4 @@ fn display_datums(datums: &[&Datum], f: &mut fmt::Formatter, size: usize) -> fmt
         }
     }
     Ok(())
-}
-
-fn robotize(string: &str) -> String {
-    string.replace(" ", "_")
-          .to_lowercase()
 }

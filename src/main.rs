@@ -19,6 +19,7 @@ mod data;
 mod ast;
 mod cli;
 mod filter;
+mod csv_parser;
 
 use std::process;
 use data::DB;
@@ -61,10 +62,13 @@ fn main() {
             }
             Ok(CLICommand::LoadCSV(filename, entity, time, joins)) => {
                 let start = time::precise_time_s();
-                match db.extend_from_csv(&entity, &filename, &time) {
-                    Ok(_) => {
+                let res = csv_parser::parse(&filename, &entity, &time, db.offset);
+                match res {
+                    Ok((offset, datums)) => {
+                        println!("new {}", datums.len());
+                        db.offset += offset;
+                        db.datums.extend(datums);
                         println!("duration {}", time::precise_time_s() - start);
-                        println!("new {}", db.datums.len() - size);
                         println!("{}", db)
                     }
                     Err(e) => println!("{:?}", e),
