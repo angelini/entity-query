@@ -59,8 +59,7 @@ fn main() {
                     Err(e) => println!("{:?}", e),
                 }
             }
-            Ok(CLICommand::LoadCSV(filename, entity, time)) => {
-                let size = db.datums.len();
+            Ok(CLICommand::LoadCSV(filename, entity, time, joins)) => {
                 let start = time::precise_time_s();
                 match db.extend_from_csv(&entity, &filename, &time) {
                     Ok(_) => {
