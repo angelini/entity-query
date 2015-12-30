@@ -9,9 +9,11 @@ Query data in the following form:
 Sample queries:
 
 ```
-e:42             # entity ID = 42
+e=42             # entity ID = 42
 v:foo            # value contains foo
 a:bar v:foo      # attribute name contains bar and the value contains foo
+t>1970           # occured after 1970
+t>=1970          # occured after or in 1970
 t:2010 | t:2011  # all datums from the year 2010 and 2011
 ```
 
