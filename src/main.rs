@@ -61,7 +61,7 @@ fn main() {
             Ok(CLICommand::LoadCSV(filename, entity, time)) => {
                 let size = db.datums.len();
                 let start = time::precise_time_s();
-                match db.from_csv(&entity, &filename, &time) {
+                match db.extend_from_csv(&entity, &filename, &time) {
                     Ok(_) => {
                         println!("duration {}", time::precise_time_s() - start);
                         println!("new {}", db.datums.len() - size);

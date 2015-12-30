@@ -82,18 +82,15 @@ impl DB {
         }
     }
 
-    pub fn from_csv<'a>(&mut self,
-                        entity: &str,
-                        filename: &str,
-                        time: &str)
-                        -> Result<(), LoadError> {
+    pub fn extend_from_csv<'a>(&mut self, entity: &str, filename: &str, time: &str)
+                               -> Result<(), LoadError> {
         let mut rdr = match csv::Reader::from_file(filename) {
             Ok(rdr) => rdr,
             Err(e) => {
                 return Err(LoadError::InvalidInput(format!("file: {}, err: {}", filename, e)))
             }
         };
-        let headers = rdr.headers().expect("Headers required to convert CSV");
+        let headers = rdr.headers().expect("headers required to convert CSV");
 
         let time_index = match headers.iter()
                                       .enumerate()
@@ -104,28 +101,26 @@ impl DB {
 
         let mut eid = self.offset;
         let new_datums = rdr.records()
-                            .flat_map(|row_res| {
+                            .map(|row_res| {
                                 let row = row_res.unwrap();
-                                let time_val = row[time_index]
-                                                   .parse::<u32>()
-                                                   .unwrap();
-
-                                eid += 1;
-                                headers.iter()
-                                       .zip(row)
-                                       .map(|(header, val)| {
-                                           Datum::new(eid,
-                                                      format!("{}/{}", entity, robotize(header)),
-                                                      val,
-                                                      time_val)
-                                       })
-                                       .collect::<Vec<Datum>>()
+                                let (offset, datums) = try!(Self::parse_row(row,
+                                                                            &headers,
+                                                                            time_index,
+                                                                            eid,
+                                                                            entity));
+                                eid = offset;
+                                Ok(datums)
                             })
-                            .collect::<Vec<Datum>>();
+                            .collect::<Result<Vec<Vec<Datum>>, LoadError>>();
 
-        self.offset = eid;
-        self.datums.extend(new_datums);
-        Ok(())
+        match new_datums {
+            Ok(d) => {
+                self.offset = eid;
+                self.datums.extend(d.into_iter().flat_map(|v| v).collect::<Vec<Datum>>());
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
     }
 
     pub fn write(&self, filename: &str) -> Result<(), WriteError> {
@@ -141,6 +136,29 @@ impl DB {
             Ok(_) => Ok(()),
             Err(e) => Err(WriteError::EncodingError(format!("file: {}, err: {}", filename, e))),
         }
+    }
+
+    fn parse_row(row: Vec<String>, headers: &Vec<String>, time_index: usize, eid: u32, entity: &str)
+                 -> Result<(u32, Vec<Datum>), LoadError> {
+        let time = match row[time_index].parse::<u32>() {
+            Ok(t) => t,
+            Err(_) => {
+                return Err(LoadError::InvalidInput(format!("time col is not an int: {}",
+                                                           row[time_index])))
+            }
+        };
+        let mut eid = eid;
+        let datums = headers.iter()
+                            .zip(row)
+                            .map(|(header, val)| {
+                                eid += 1;
+                                Datum::new(eid,
+                                           format!("{}/{}", entity, robotize(header)),
+                                           val,
+                                           time)
+                            })
+                            .collect();
+        Ok((eid, datums))
     }
 }
 
