@@ -4,6 +4,7 @@
 
 #![feature(plugin)]
 #![plugin(regex_macros)]
+#![plugin(clippy)]
 
 extern crate regex;
 extern crate rustc_serialize;

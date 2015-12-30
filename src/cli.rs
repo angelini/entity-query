@@ -17,7 +17,7 @@ pub enum ParseError {
     InvalidArgs(String),
 }
 
-pub fn read<'a>() -> Result<CLICommand, ParseError> {
+pub fn read() -> Result<CLICommand, ParseError> {
     let input = match linenoise::input("> ") {
         Some(i) => i,
         None => return Ok(CLICommand::None),
@@ -40,9 +40,9 @@ pub fn read<'a>() -> Result<CLICommand, ParseError> {
         "l" => Ok(CLICommand::Load(all_args)),
         "c" => {
             if args.len() == 3 {
-                Ok(CLICommand::LoadCSV((*args.get(0).unwrap()).to_string(),
-                                       (*args.get(1).unwrap()).to_string(),
-                                       (*args.get(2).unwrap()).to_string()))
+                Ok(CLICommand::LoadCSV((*args.get(0).unwrap()).to_owned(),
+                                       (*args.get(1).unwrap()).to_owned(),
+                                       (*args.get(2).unwrap()).to_owned()))
             } else {
                 Err(ParseError::InvalidArgs(all_args))
             }
@@ -55,6 +55,6 @@ pub fn read<'a>() -> Result<CLICommand, ParseError> {
             Ok(CLICommand::None)
         }
         "exit" => Ok(CLICommand::Exit),
-        _ => Err(ParseError::InvalidCommand(command.to_string())),
+        _ => Err(ParseError::InvalidCommand(command.to_owned())),
     }
 }

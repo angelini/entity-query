@@ -12,24 +12,24 @@ pub enum Comparator {
 
 impl Comparator {
     fn test_int(&self, left: u32, right: u32) -> bool {
-        match self {
-            &Comparator::Equal => left == right,
-            &Comparator::Greater => left > right,
-            &Comparator::GreaterOrEqual => left >= right,
-            &Comparator::Less => left < right,
-            &Comparator::LessOrEqual => left >= right,
+        match *self {
+            Comparator::Equal => left == right,
+            Comparator::Greater => left > right,
+            Comparator::GreaterOrEqual => left >= right,
+            Comparator::Less => left < right,
+            Comparator::LessOrEqual => left >= right,
             _ => false,
         }
     }
 
     fn test_str(&self, left: &str, right: &str) -> bool {
-        match self {
-            &Comparator::Contains => left.contains(right),
-            &Comparator::Equal => left == right,
-            &Comparator::Greater => left > right,
-            &Comparator::GreaterOrEqual => left >= right,
-            &Comparator::Less => left < right,
-            &Comparator::LessOrEqual => left >= right,
+        match *self {
+            Comparator::Contains => left.contains(right),
+            Comparator::Equal => left == right,
+            Comparator::Greater => left > right,
+            Comparator::GreaterOrEqual => left >= right,
+            Comparator::Less => left < right,
+            Comparator::LessOrEqual => left >= right,
         }
     }
 }
@@ -78,28 +78,28 @@ impl ASTNode {
     }
 
     pub fn eval(&self, datum: &Datum) -> bool {
-        match self {
-            &ASTNode::True => true,
-            &ASTNode::Expression(ref exp) => {
-                let e_pred = match &exp.e {
-                    &Some((v, ref comp)) => comp.test_int(datum.e, v),
-                    &None => true,
+        match *self {
+            ASTNode::True => true,
+            ASTNode::Expression(ref exp) => {
+                let e_pred = match exp.e {
+                    Some((v, ref comp)) => comp.test_int(datum.e, v),
+                    None => true,
                 };
-                let a_pred = match &exp.a {
-                    &Some((ref v, ref comp)) => comp.test_str(&datum.a, &v),
-                    &None => true,
+                let a_pred = match exp.a {
+                    Some((ref v, ref comp)) => comp.test_str(&datum.a, &v),
+                    None => true,
                 };
-                let v_pred = match &exp.v {
-                    &Some((ref v, ref comp)) => comp.test_str(&datum.v, &v),
-                    &None => true,
+                let v_pred = match exp.v {
+                    Some((ref v, ref comp)) => comp.test_str(&datum.v, &v),
+                    None => true,
                 };
-                let t_pred = match &exp.t {
-                    &Some((v, ref comp)) => comp.test_int(datum.t, v),
-                    &None => true,
+                let t_pred = match exp.t {
+                    Some((v, ref comp)) => comp.test_int(datum.t, v),
+                    None => true,
                 };
                 e_pred && a_pred && v_pred && t_pred
             }
-            &ASTNode::Or(ref l, ref r) => l.eval(datum) || r.eval(datum),
+            ASTNode::Or(ref l, ref r) => l.eval(datum) || r.eval(datum),
         }
     }
 
@@ -132,8 +132,8 @@ impl ASTNode {
 
                 match prefix {
                     'e' => exp.e = Some((val.parse::<u32>().unwrap(), comparator)),
-                    'a' => exp.a = Some((val.to_string(), comparator)),
-                    'v' => exp.v = Some((val.to_string(), comparator)),
+                    'a' => exp.a = Some((val.to_owned(), comparator)),
+                    'v' => exp.v = Some((val.to_owned(), comparator)),
                     't' => exp.t = Some((val.parse::<u32>().unwrap(), comparator)),
                     _ => return Err(ParseError::InvalidState(query)),
                 }

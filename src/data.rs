@@ -66,10 +66,10 @@ impl DB {
         }
     }
 
-    pub fn from_file<'a>(filename: &'a str) -> Result<DB, LoadError> {
+    pub fn from_file(filename: &str) -> Result<DB, LoadError> {
         let file = match File::open(filename) {
             Ok(f) => f,
-            Err(_) => return Err(LoadError::FileMissing(filename.to_string())),
+            Err(_) => return Err(LoadError::FileMissing(filename.to_owned())),
         };
         let reader = BufReader::new(file);
         let mut decoder = ZlibDecoder::new(reader);
@@ -82,8 +82,8 @@ impl DB {
         }
     }
 
-    pub fn extend_from_csv<'a>(&mut self, entity: &str, filename: &str, time: &str)
-                               -> Result<(), LoadError> {
+    pub fn extend_from_csv(&mut self, entity: &str, filename: &str, time: &str)
+                           -> Result<(), LoadError> {
         let mut rdr = match csv::Reader::from_file(filename) {
             Ok(rdr) => rdr,
             Err(e) => {
@@ -126,7 +126,7 @@ impl DB {
     pub fn write(&self, filename: &str) -> Result<(), WriteError> {
         let path = path::Path::new(filename);
         if path.exists() {
-            return Err(WriteError::FileExists(filename.to_string()));
+            return Err(WriteError::FileExists(filename.to_owned()));
         }
 
         let writer = BufWriter::new(File::create(path).unwrap());
@@ -138,7 +138,7 @@ impl DB {
         }
     }
 
-    fn parse_row(row: Vec<String>, headers: &Vec<String>, time_index: usize, eid: u32, entity: &str)
+    fn parse_row(row: Vec<String>, headers: &[String], time_index: usize, eid: u32, entity: &str)
                  -> Result<(u32, Vec<Datum>), LoadError> {
         let time = match row[time_index].parse::<u32>() {
             Ok(t) => t,
@@ -164,7 +164,7 @@ impl DB {
 
 impl fmt::Display for DB {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        display_datums(&self.datums.iter().collect(), f, 20)
+        display_datums(&self.datums.iter().collect::<Vec<&Datum>>(), f, 20)
     }
 }
 
@@ -174,7 +174,7 @@ impl<'a> fmt::Display for DBView<'a> {
     }
 }
 
-fn display_datums(datums: &Vec<&Datum>, f: &mut fmt::Formatter, size: usize) -> fmt::Result {
+fn display_datums(datums: &[&Datum], f: &mut fmt::Formatter, size: usize) -> fmt::Result {
     if datums.len() == 0 {
         try!(write!(f, "[]"))
     }
