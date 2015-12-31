@@ -35,8 +35,34 @@ impl fmt::Display for Datum {
 }
 
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable, PartialEq)]
+pub struct Ref {
+    pub e: u32,
+    pub a: String,
+    pub v: u32,
+    pub t: u32,
+}
+
+impl Ref {
+    pub fn new(e: u32, a: String, v: u32, t: u32) -> Ref {
+        Ref {
+            e: e,
+            a: a,
+            v: v,
+            t: t,
+        }
+    }
+}
+
+impl fmt::Display for Ref {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {}, {}, {})", self.e, self.a, self.v, self.t)
+    }
+}
+
+#[derive(Debug, Clone, RustcEncodable, RustcDecodable, PartialEq)]
 pub struct DB {
     pub datums: Vec<Datum>,
+    pub refs: Vec<Ref>,
     pub offset: u32,
 }
 
@@ -61,6 +87,7 @@ impl DB {
     pub fn new() -> DB {
         DB {
             datums: vec![],
+            refs: vec![],
             offset: 0,
         }
     }
@@ -99,7 +126,10 @@ impl DB {
 
 impl fmt::Display for DB {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        display_datums(&self.datums.iter().collect::<Vec<&Datum>>(), f, 20)
+        try!(write!(f, "datums:\n"));
+        try!(display_datums(&self.datums.iter().collect::<Vec<&Datum>>(), f, 20));
+        try!(write!(f, "\nrefs:\n"));
+        display_datums(&self.refs.iter().collect::<Vec<&Ref>>(), f, 20)
     }
 }
 
@@ -109,9 +139,11 @@ impl<'a> fmt::Display for DBView<'a> {
     }
 }
 
-fn display_datums(datums: &[&Datum], f: &mut fmt::Formatter, size: usize) -> fmt::Result {
+fn display_datums<T>(datums: &[&T], f: &mut fmt::Formatter, size: usize) -> fmt::Result
+    where T: fmt::Display
+{
     if datums.len() == 0 {
-        try!(write!(f, "[]"))
+        try!(write!(f, "()"))
     }
 
     for (idx, datum) in datums.iter().enumerate().take(size) {

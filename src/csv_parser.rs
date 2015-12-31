@@ -1,5 +1,36 @@
 use csv;
-use data::{Datum, LoadError};
+use ast::ASTNode;
+use cli::Join;
+use data::{Datum, DB, Ref, LoadError};
+use filter::Filter;
+
+// TODO: Sort both datasets first and do a streaming join
+pub fn find_refs(datums: &[Datum], db: &DB, entity: &str, join: Join) -> Vec<Ref> {
+    let (column, query) = (join.0, join.1);
+    let attribute = format!("{}/{}", entity, robotize(&column));
+    let ast = ASTNode::parse(&query).unwrap();
+
+    let new_datums = datums.iter().filter(|d| d.a == attribute).cloned().collect::<Vec<Datum>>();
+    let old_datums = Filter::new(db, &ast, 12).execute().datums;
+
+    new_datums.iter()
+              .map(|new| {
+                  let new_entity = new.a.split('/').next().unwrap();
+                  match old_datums.iter().find(|o| o.v == new.v) {
+                      Some(old) => {
+                          let old_entity = old.a.split('/').next().unwrap();
+                          Some(Ref::new(new.e,
+                                        format!("{}/{}", new_entity, old_entity),
+                                        old.e,
+                                        new.t))
+                      }
+                      None => None,
+                  }
+              })
+              .filter(|o| o.is_some())
+              .map(|o| o.unwrap())
+              .collect::<Vec<Ref>>()
+}
 
 pub fn parse(filename: &str, entity: &str, time: &str, offset: u32)
              -> Result<(u32, Vec<Datum>), LoadError> {

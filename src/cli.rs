@@ -1,7 +1,7 @@
 use linenoise;
 
 #[derive(Debug)]
-pub struct Join(String, String);
+pub struct Join(pub String, pub String);
 
 #[derive(Debug)]
 pub enum CLICommand {
@@ -75,8 +75,6 @@ fn parse_joins(raw: &str) -> Result<Vec<Join>, ParseError> {
        .map(|s| s.trim())
        .filter(|s| *s != "")
        .map(|clause| {
-           println!("clause {}", clause);
-
            if let Some(caps) = join_re.captures(clause) {
                Ok(Join(caps.at(1).unwrap().to_owned(),
                        caps.at(2).unwrap().to_owned()))

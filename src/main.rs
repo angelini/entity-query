@@ -40,8 +40,8 @@ fn main() {
                     Ok(ast) => {
                         let start = time::precise_time_s();
                         let res = Filter::new(&db, &ast, 12).execute();
-                        println!("duration {}", time::precise_time_s() - start);
-                        println!("len {}", res.datums.len());
+                        println!("duration: {}", time::precise_time_s() - start);
+                        println!("len: {}", res.datums.len());
                         println!("{}", res)
                     }
                     Err(e) => println!("{:?}", e),
@@ -53,8 +53,8 @@ fn main() {
                 match DB::from_file(&filename) {
                     Ok(d) => {
                         db = d;
-                        println!("duration {}", time::precise_time_s() - start);
-                        println!("len {}", db.datums.len());
+                        println!("duration: {}", time::precise_time_s() - start);
+                        println!("len: {}", db.datums.len());
                         println!("{}", db)
                     }
                     Err(e) => println!("{:?}", e),
@@ -62,13 +62,19 @@ fn main() {
             }
             Ok(CLICommand::LoadCSV(filename, entity, time, joins)) => {
                 let start = time::precise_time_s();
-                let res = csv_parser::parse(&filename, &entity, &time, db.offset);
-                match res {
+
+                match csv_parser::parse(&filename, &entity, &time, db.offset) {
                     Ok((offset, datums)) => {
-                        println!("new {}", datums.len());
+                        let mut refs = vec!();
+                        for join in joins {
+                            let n_refs = csv_parser::find_refs(&datums, &db, &entity, join);
+                            refs.extend(n_refs);
+                        }
+                        println!("new: {}", datums.len());
                         db.offset += offset;
                         db.datums.extend(datums);
-                        println!("duration {}", time::precise_time_s() - start);
+                        db.refs.extend(refs);
+                        println!("duration: {}", time::precise_time_s() - start);
                         println!("{}", db)
                     }
                     Err(e) => println!("{:?}", e),
