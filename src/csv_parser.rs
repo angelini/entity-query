@@ -4,92 +4,127 @@ use cli::Join;
 use data::{Datum, DB, Ref, LoadError};
 use filter::Filter;
 
-// TODO: Sort both datasets first and do a streaming join
-pub fn find_refs(datums: &[Datum], db: &DB, entity: &str, join: Join) -> Vec<Ref> {
-    let (column, query) = (join.0, join.1);
-    let attribute = format!("{}/{}", entity, robotize(&column));
-    let ast = ASTNode::parse(&query).unwrap();
-
-    let new_datums = datums.iter().filter(|d| d.a == attribute).cloned().collect::<Vec<Datum>>();
-    let old_datums = Filter::new(db, &ast, 12).execute().datums;
-
-    new_datums.iter()
-              .map(|new| {
-                  let new_entity = new.a.split('/').next().unwrap();
-                  match old_datums.iter().find(|o| o.v == new.v) {
-                      Some(old) => {
-                          let old_entity = old.a.split('/').next().unwrap();
-                          Some(Ref::new(new.e,
-                                        format!("{}/{}", new_entity, old_entity),
-                                        old.e,
-                                        new.t))
-                      }
-                      None => None,
-                  }
-              })
-              .filter(|o| o.is_some())
-              .map(|o| o.unwrap())
-              .collect::<Vec<Ref>>()
+#[derive(Debug)]
+pub struct CSVParser<'a> {
+    filename: &'a str,
+    entity: &'a str,
+    time: &'a str,
+    joins: &'a [Join],
 }
 
-pub fn parse(filename: &str, entity: &str, time: &str, offset: u32)
-             -> Result<(u32, Vec<Datum>), LoadError> {
-    let mut rdr = match csv::Reader::from_file(filename) {
-        Ok(rdr) => rdr,
-        Err(e) => return Err(LoadError::InvalidInput(format!("file: {}, err: {}", filename, e))),
-    };
-    let headers = rdr.headers().expect("headers required to convert CSV");
+impl<'a> CSVParser<'a> {
+    pub fn new(filename: &'a str, entity: &'a str, time: &'a str, joins: &'a [Join]) -> CSVParser<'a> {
+        CSVParser {
+            filename: filename,
+            entity: entity,
+            time: time,
+            joins: joins,
+        }
+    }
 
-    let time_index = match headers.iter()
-                                  .enumerate()
-                                  .find(|&(_, h)| h == time) {
-        Some((idx, _)) => idx,
-        None => return Err(LoadError::InvalidInput(format!("time header not found: {}", time))),
-    };
+    pub fn parse(self, db: &DB) -> Result<(Vec<Datum>, Vec<Ref>, u32), LoadError> {
+        let mut rdr = match csv::Reader::from_file(self.filename) {
+            Ok(rdr) => rdr,
+            Err(e) => {
+                return Err(LoadError::InvalidInput(format!("file: {}, err: {}", self.filename, e)))
+            }
+        };
+        let headers = rdr.headers().expect("headers required to convert CSV");
 
-    let mut eid = offset;
-    let datums = rdr.records()
-                    .map(|row_res| {
-                        let row = row_res.unwrap();
-                        let (offset, datums) = try!(parse_row(row,
-                                                              &headers,
-                                                              time_index,
-                                                              eid,
-                                                              entity));
-                        eid = offset;
-                        Ok(datums)
-                    })
-                    .collect::<Result<Vec<Vec<Datum>>, LoadError>>();
+        let time_index = match headers.iter()
+                                      .enumerate()
+                                      .find(|&(_, h)| h == self.time) {
+            Some((idx, _)) => idx,
+            None => {
+                return Err(LoadError::InvalidInput(format!("time header not found: {}", self.time)))
+            }
+        };
 
-    match datums {
-        Ok(d) => Ok((eid, d.into_iter().flat_map(|v| v).collect())),
-        Err(e) => Err(e),
+        let mut eid = db.offset;
+        let datums_res = rdr.records()
+                            .map(|row_res| {
+                                let row = row_res.unwrap();
+                                let (offset, datums) = try!(Self::parse_row(row,
+                                                                            &headers,
+                                                                            time_index,
+                                                                            eid,
+                                                                            self.entity));
+                                eid = offset;
+                                Ok(datums)
+                            })
+                            .collect::<Result<Vec<Vec<Datum>>, LoadError>>();
+
+        let datums = match datums_res {
+            Ok(d) => d.into_iter().flat_map(|v| v).collect::<Vec<Datum>>(),
+            Err(e) => return Err(e),
+        };
+
+        let refs = self.find_refs(&datums, db);
+        Ok((datums, refs, eid))
+    }
+
+    // TODO: Sort both datasets first and do a streaming join
+    fn find_refs(&self, datums: &[Datum], db: &DB) -> Vec<Ref> {
+        self.joins
+            .iter()
+            .flat_map(|join| {
+                let (column, query) = (&join.0, &join.1);
+                let attribute = format!("{}/{}", self.entity, robotize(&column));
+                let ast = ASTNode::parse(&query).unwrap();
+
+                let new_datums = datums.iter()
+                                       .filter(|d| d.a == attribute)
+                                       .cloned()
+                                       .collect::<Vec<Datum>>();
+                let old_datums = Filter::new(db, &ast, 12).execute().datums;
+
+                new_datums.iter()
+                          .map(|new| {
+                              let new_entity = new.a.split('/').next().unwrap();
+                              match old_datums.iter().find(|o| o.v == new.v) {
+                                  Some(old) => {
+                                      let old_entity = old.a.split('/').next().unwrap();
+                                      Some(Ref::new(new.e,
+                                                    format!("{}/{}", new_entity, old_entity),
+                                                    old.e,
+                                                    new.t))
+                                  }
+                                  None => None,
+                              }
+                          })
+                          .filter(|o| o.is_some())
+                          .map(|o| o.unwrap())
+                          .collect::<Vec<Ref>>()
+            })
+            .collect::<Vec<Ref>>()
+    }
+
+    fn parse_row(row: Vec<String>, headers: &[String], time_index: usize, eid: u32, entity: &str)
+                 -> Result<(u32, Vec<Datum>), LoadError> {
+        let time = match row[time_index].parse::<u32>() {
+            Ok(t) => t,
+            Err(_) => {
+                return Err(LoadError::InvalidInput(format!("time col is not an int: {}",
+                                                           row[time_index])))
+            }
+        };
+        let mut eid = eid;
+        let datums = headers.iter()
+                            .enumerate()
+                            .filter(|&(i, _)| i != time_index)
+                            .map(|(_, h)| h)
+                            .zip(row)
+                            .map(|(header, val)| {
+                                eid += 1;
+                                Datum::new(eid,
+                                           format!("{}/{}", entity, robotize(header)),
+                                           val,
+                                           time)
+                            })
+                            .collect();
+        Ok((eid, datums))
     }
 }
-
-fn parse_row(row: Vec<String>, headers: &[String], time_index: usize, eid: u32, entity: &str)
-             -> Result<(u32, Vec<Datum>), LoadError> {
-    let time = match row[time_index].parse::<u32>() {
-        Ok(t) => t,
-        Err(_) => {
-            return Err(LoadError::InvalidInput(format!("time col is not an int: {}",
-                                                       row[time_index])))
-        }
-    };
-    let mut eid = eid;
-    let datums = headers.iter()
-                        .enumerate()
-                        .filter(|&(i, _)| i != time_index)
-                        .map(|(_, h)| h)
-                        .zip(row)
-                        .map(|(header, val)| {
-                            eid += 1;
-                            Datum::new(eid, format!("{}/{}", entity, robotize(header)), val, time)
-                        })
-                        .collect();
-    Ok((eid, datums))
-}
-
 
 fn robotize(string: &str) -> String {
     string.replace(" ", "_")

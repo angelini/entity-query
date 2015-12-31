@@ -26,6 +26,7 @@ use data::DB;
 use ast::ASTNode;
 use cli::CLICommand;
 use filter::Filter;
+use csv_parser::CSVParser;
 
 fn main() {
     linenoise::history_set_max_len(1000);
@@ -62,18 +63,14 @@ fn main() {
             }
             Ok(CLICommand::LoadCSV(filename, entity, time, joins)) => {
                 let start = time::precise_time_s();
+                let parser = CSVParser::new(&filename, &entity, &time, &joins);
 
-                match csv_parser::parse(&filename, &entity, &time, db.offset) {
-                    Ok((offset, datums)) => {
-                        let mut refs = vec!();
-                        for join in joins {
-                            let n_refs = csv_parser::find_refs(&datums, &db, &entity, join);
-                            refs.extend(n_refs);
-                        }
+                match parser.parse(&db) {
+                    Ok((datums, refs, offset)) => {
                         println!("new: {}", datums.len());
-                        db.offset += offset;
                         db.datums.extend(datums);
                         db.refs.extend(refs);
+                        db.offset += offset;
                         println!("duration: {}", time::precise_time_s() - start);
                         println!("{}", db)
                     }
