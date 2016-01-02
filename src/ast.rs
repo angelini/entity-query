@@ -1,4 +1,5 @@
 use data::Datum;
+use grammar;
 
 #[derive(Debug, Clone)]
 pub enum Comparator {
@@ -42,6 +43,32 @@ pub struct ExpressionTest {
     t: Option<(u32, Comparator)>,
 }
 
+impl ExpressionTest {
+    pub fn new(preds: Vec<(String, String, Comparator)>) -> ExpressionTest {
+        let mut e = None;
+        let mut a = None;
+        let mut v = None;
+        let mut t = None;
+
+        for (name, val, comp) in preds {
+            match name.as_ref() {
+                "e" => e = Some((val.parse::<u32>().unwrap(), comp)),
+                "a" => a = Some((val, comp)),
+                "v" => v = Some((val, comp)),
+                "t" => t = Some((val.parse::<u32>().unwrap(), comp)),
+                _ => continue,
+            }
+        }
+
+        ExpressionTest {
+            e: e,
+            a: a,
+            v: v,
+            t: t,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum ASTNode {
     True,
@@ -49,32 +76,9 @@ pub enum ASTNode {
     Expression(ExpressionTest),
 }
 
-#[derive(Debug)]
-pub enum ParseError<'a> {
-    InvalidState(&'a str),
-    InvalidPredicate(&'a str),
-}
-
 impl ASTNode {
-    pub fn parse(query: &str) -> Result<ASTNode, ParseError> {
-        let or_re = regex!(r"^(.*)\|(.*)$");
-        let true_re = regex!(r"^\s*$");
-
-        if let Some(caps) = or_re.captures(query) {
-            let left = Self::parse(caps.at(1).unwrap());
-            let right = Self::parse(caps.at(2).unwrap());
-
-            match (left, right) {
-                (Ok(l), Ok(r)) => Ok(ASTNode::Or(Box::new(l), Box::new(r))),
-                (Err(e), _) => Err(e),
-                (_, Err(e)) => Err(e),
-
-            }
-        } else if true_re.is_match(query) {
-            Ok(ASTNode::True)
-        } else {
-            Self::parse_expression(query)
-        }
+    pub fn parse(query: &str) -> Result<ASTNode, grammar::ParseError> {
+        grammar::ast(query)
     }
 
     pub fn eval(&self, datum: &Datum) -> bool {
@@ -101,46 +105,5 @@ impl ASTNode {
             }
             ASTNode::Or(ref l, ref r) => l.eval(datum) || r.eval(datum),
         }
-    }
-
-    fn parse_expression(query: &str) -> Result<ASTNode, ParseError> {
-        let exp_re = regex!(r"^[eavt][=:<>]=?\S+$");
-        let mut exp = ExpressionTest {
-            e: None,
-            a: None,
-            v: None,
-            t: None,
-        };
-
-        for split in query.split(' ') {
-            let predicate = split.trim();
-
-            if exp_re.is_match(predicate) {
-                let prefix = predicate.chars().nth(0).unwrap();
-                let comparator_stop = if predicate.chars().nth(2).unwrap() == '=' { 3 } else { 2 };
-                let val = &predicate[comparator_stop..];
-
-                let comparator = match &predicate[1..comparator_stop] {
-                    ":" => Comparator::Contains,
-                    "=" => Comparator::Equal,
-                    ">" => Comparator::Greater,
-                    ">=" => Comparator::GreaterOrEqual,
-                    "<" => Comparator::Less,
-                    "<=" => Comparator::LessOrEqual,
-                    _ => return Err(ParseError::InvalidPredicate(predicate)),
-                };
-
-                match prefix {
-                    'e' => exp.e = Some((val.parse::<u32>().unwrap(), comparator)),
-                    'a' => exp.a = Some((val.to_owned(), comparator)),
-                    'v' => exp.v = Some((val.to_owned(), comparator)),
-                    't' => exp.t = Some((val.parse::<u32>().unwrap(), comparator)),
-                    _ => return Err(ParseError::InvalidState(query)),
-                }
-            } else {
-                return Err(ParseError::InvalidPredicate(predicate));
-            }
-        }
-        Ok(ASTNode::Expression(exp))
     }
 }

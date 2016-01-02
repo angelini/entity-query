@@ -4,7 +4,9 @@
 
 #![feature(plugin)]
 #![plugin(regex_macros)]
+#![plugin(peg_syntax_ext)]
 #![plugin(clippy)]
+#![allow(len_zero)] // for pegile macro
 
 extern crate regex;
 extern crate rustc_serialize;
@@ -27,6 +29,8 @@ use ast::ASTNode;
 use cli::CLICommand;
 use filter::Filter;
 use csv_parser::CSVParser;
+
+peg_file! grammar("grammar.rustpeg");
 
 fn main() {
     linenoise::history_set_max_len(1000);

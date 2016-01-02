@@ -1,0 +1,33 @@
+use ast::{ASTNode, Comparator, ExpressionTest};
+
+#[pub]
+ast -> ASTNode
+  = e1:expr whitespace+ "|" whitespace+ e2:ast { ASTNode::Or(Box::new(e1), Box::new(e2)) }
+  / e:expr { e }
+  / whitespace* { ASTNode::True }
+
+expr -> ASTNode
+  = p:preds { ASTNode::Expression(ExpressionTest::new(p)) }
+
+preds -> Vec<(String, String, Comparator)>
+  = p:pred ++ whitespace { p }
+
+pred -> (String, String, Comparator)
+  = n:pred_name "=" v:pred_val { (n, v, Comparator::Equal) }
+  / n:pred_name ">" v:pred_val { (n, v, Comparator::Greater) }
+  / n:pred_name ">=" v:pred_val { (n, v, Comparator::GreaterOrEqual) }
+  / n:pred_name "<" v:pred_val { (n, v, Comparator::Less) }
+  / n:pred_name "<=" v:pred_val { (n, v, Comparator::LessOrEqual) }
+  / n:pred_name_for_contains ":" v:pred_val { (n, v, Comparator::Contains) }
+
+pred_name -> String
+  = [eavt] { match_str.to_owned() }
+
+pred_name_for_contains -> String
+  = [avt] { match_str.to_owned() }
+
+pred_val -> String
+  = [a-zA-Z0-9_]+ { match_str.to_owned() }
+
+whitespace
+  = [ \t\u{00A0}\u{FEFF}\u{1680}\u{180E}\u{2000}-\u{200A}\u{202F}\u{205F}\u{3000}]
