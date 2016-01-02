@@ -24,6 +24,8 @@ impl<'a> Filter<'a> {
         let (tx, rx) = channel();
         let mut pool = Pool::new(threads as u32);
 
+        println!("plan: {:?}", Plan::new(&self.ast).steps);
+
         pool.scoped(|scoped| {
             for i in 0..threads {
                 let start = i * size;
@@ -48,5 +50,32 @@ impl<'a> Filter<'a> {
         }
 
         DBView { datums: results }
+    }
+}
+
+struct Plan {
+    steps: Vec<ASTNode>,
+}
+
+impl Plan {
+    fn new(ast: &ASTNode) -> Plan {
+        Plan { steps: Self::expand(ast) }
+    }
+
+    fn expand(ast: &ASTNode) -> Vec<ASTNode> {
+        match *ast {
+            ASTNode::Join(ref p, ref c) => {
+                let mut expanded = Plan::expand(c);
+                let len = expanded.len();
+                expanded.push(ASTNode::CachedJoin(p.clone(), len - 1));
+                expanded
+            }
+            ASTNode::Or(ref l, ref r) => {
+                let mut expanded = Plan::expand(l);
+                expanded.append(&mut Plan::expand(r));
+                expanded
+            }
+            _ => vec![ast.clone()]
+        }
     }
 }

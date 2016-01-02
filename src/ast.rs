@@ -49,6 +49,7 @@ pub enum ASTNode {
     Or(Box<ASTNode>, Box<ASTNode>),
     Expression(Predicates),
     Join(Predicates, Box<ASTNode>),
+    CachedJoin(Predicates, usize),
 }
 
 impl ASTNode {
@@ -122,6 +123,9 @@ impl ASTNode {
                 e_pred && a_pred && v_pred && t_pred
             }
             ASTNode::Join(ref preds, ref child) => {
+                unimplemented!()
+            }
+            ASTNode::CachedJoin(ref preds, cache_idx) => {
                 unimplemented!()
             }
             ASTNode::Or(ref l, ref r) => l.eval(datum) || r.eval(datum),
