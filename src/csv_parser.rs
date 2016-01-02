@@ -22,7 +22,7 @@ impl<'a> CSVParser<'a> {
         }
     }
 
-    pub fn parse(self, db: &DB) -> Result<(Vec<Datum>, Vec<Ref>, u32), LoadError> {
+    pub fn parse(self, db: &DB) -> Result<(Vec<Datum>, Vec<Ref>, usize), LoadError> {
         let mut rdr = match csv::Reader::from_file(self.filename) {
             Ok(rdr) => rdr,
             Err(e) => {
@@ -99,9 +99,9 @@ impl<'a> CSVParser<'a> {
             .collect::<Vec<Ref>>()
     }
 
-    fn parse_row(row: Vec<String>, headers: &[String], time_index: usize, eid: u32, entity: &str)
-                 -> Result<(u32, Vec<Datum>), LoadError> {
-        let time = match row[time_index].parse::<u32>() {
+    fn parse_row(row: Vec<String>, headers: &[String], time_index: usize, eid: usize, entity: &str)
+                 -> Result<(usize, Vec<Datum>), LoadError> {
+        let time = match row[time_index].parse::<usize>() {
             Ok(t) => t,
             Err(_) => {
                 return Err(LoadError::InvalidInput(format!("time col is not an int: {}",

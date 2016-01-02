@@ -4,13 +4,13 @@ use ast::ASTNode;
 use data::{Datum, DB, DBView};
 
 pub struct Filter<'a> {
-    threads: u32,
+    threads: usize,
     db: &'a DB,
     ast: &'a ASTNode,
 }
 
 impl<'a> Filter<'a> {
-    pub fn new(db: &'a DB, ast: &'a ASTNode, threads: u32) -> Filter<'a> {
+    pub fn new(db: &'a DB, ast: &'a ASTNode, threads: usize) -> Filter<'a> {
         Filter {
             threads: threads,
             db: db,
@@ -19,17 +19,16 @@ impl<'a> Filter<'a> {
     }
 
     pub fn execute(self) -> DBView<'a> {
-        let threads = 12;
-        let size = self.db.datums.len() / self.threads as usize;
+        let size = self.db.datums.len() / self.threads;
         let (tx, rx) = channel();
-        let mut pool = Pool::new(threads as u32);
+        let mut pool = Pool::new(self.threads as u32);
 
         println!("plan: {:?}", Plan::new(&self.ast).steps);
 
         pool.scoped(|scoped| {
-            for i in 0..threads {
+            for i in 0..self.threads {
                 let start = i * size;
-                let stop = if i == (threads - 1) { self.db.datums.len() } else { i * size + size };
+                let stop = if i == (self.threads - 1) { self.db.datums.len() } else { i * size + size };
 
                 let thread_tx = tx.clone();
                 let thread_ast = self.ast.clone();
@@ -45,7 +44,7 @@ impl<'a> Filter<'a> {
         });
 
         let mut results: Vec<&Datum> = vec![];
-        for _ in 0..threads {
+        for _ in 0..self.threads {
             results.extend(rx.recv().unwrap())
         }
 

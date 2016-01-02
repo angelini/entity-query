@@ -11,14 +11,14 @@ use flate2::Compression;
 
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable, PartialEq)]
 pub struct Datum {
-    pub e: u32,
+    pub e: usize,
     pub a: String,
     pub v: String,
-    pub t: u32,
+    pub t: usize,
 }
 
 impl Datum {
-    pub fn new(e: u32, a: String, v: String, t: u32) -> Datum {
+    pub fn new(e: usize, a: String, v: String, t: usize) -> Datum {
         Datum {
             e: e,
             a: a,
@@ -36,14 +36,14 @@ impl fmt::Display for Datum {
 
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable, PartialEq)]
 pub struct Ref {
-    pub e: u32,
+    pub e: usize,
     pub a: String,
-    pub v: u32,
-    pub t: u32,
+    pub v: usize,
+    pub t: usize,
 }
 
 impl Ref {
-    pub fn new(e: u32, a: String, v: u32, t: u32) -> Ref {
+    pub fn new(e: usize, a: String, v: usize, t: usize) -> Ref {
         Ref {
             e: e,
             a: a,
@@ -63,7 +63,7 @@ impl fmt::Display for Ref {
 pub struct DB {
     pub datums: Vec<Datum>,
     pub refs: Vec<Ref>,
-    pub offset: u32,
+    pub offset: usize,
 }
 
 #[derive(Debug)]

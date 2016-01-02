@@ -12,7 +12,7 @@ pub enum Comparator {
 }
 
 impl Comparator {
-    fn test_int(&self, left: u32, right: u32) -> bool {
+    fn test_int(&self, left: usize, right: usize) -> bool {
         match *self {
             Comparator::Equal => left == right,
             Comparator::Greater => left > right,
@@ -37,10 +37,10 @@ impl Comparator {
 
 #[derive(Debug, Clone)]
 pub struct Predicates {
-    e: Option<(u32, Comparator)>,
+    e: Option<(usize, Comparator)>,
     a: Option<(String, Comparator)>,
     v: Option<(String, Comparator)>,
-    t: Option<(u32, Comparator)>,
+    t: Option<(usize, Comparator)>,
 }
 
 #[derive(Debug, Clone)]
@@ -71,12 +71,12 @@ impl ASTNode {
                         e = Some((0, comp));
                         child = Some(Box::new(ast.unwrap()));
                     } else {
-                        e = Some((val.parse::<u32>().unwrap(), comp))
+                        e = Some((val.parse::<usize>().unwrap(), comp))
                     }
                 }
                 "a" => a = Some((val, comp)),
                 "v" => v = Some((val, comp)),
-                "t" => t = Some((val.parse::<u32>().unwrap(), comp)),
+                "t" => t = Some((val.parse::<usize>().unwrap(), comp)),
                 _ => continue,
             }
         }
