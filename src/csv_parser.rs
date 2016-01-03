@@ -44,12 +44,12 @@ impl<'a> CSVParser<'a> {
         let datums_res = rdr.records()
                             .map(|row_res| {
                                 let row = row_res.unwrap();
-                                let (offset, datums) = try!(Self::parse_row(row,
-                                                                            &headers,
-                                                                            time_index,
-                                                                            eid,
-                                                                            self.entity));
-                                eid = offset;
+                                eid += 1;
+                                let datums = try!(Self::parse_row(row,
+                                                                  &headers,
+                                                                  time_index,
+                                                                  eid,
+                                                                  self.entity));
                                 Ok(datums)
                             })
                             .collect::<Result<Vec<Vec<Datum>>, LoadError>>();
@@ -100,7 +100,7 @@ impl<'a> CSVParser<'a> {
     }
 
     fn parse_row(row: Vec<String>, headers: &[String], time_index: usize, eid: usize, entity: &str)
-                 -> Result<(usize, Vec<Datum>), LoadError> {
+                 -> Result<Vec<Datum>, LoadError> {
         let time = match row[time_index].parse::<usize>() {
             Ok(t) => t,
             Err(_) => {
@@ -108,21 +108,19 @@ impl<'a> CSVParser<'a> {
                                                            row[time_index])))
             }
         };
-        let mut eid = eid;
         let datums = headers.iter()
                             .enumerate()
                             .filter(|&(i, _)| i != time_index)
                             .map(|(_, h)| h)
                             .zip(row)
                             .map(|(header, val)| {
-                                eid += 1;
                                 Datum::new(eid,
                                            format!("{}/{}", entity, robotize(header)),
                                            val,
                                            time)
                             })
                             .collect();
-        Ok((eid, datums))
+        Ok(datums)
     }
 }
 
