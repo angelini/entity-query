@@ -43,6 +43,7 @@ fn main() {
             Ok(CLICommand::Query(query)) => {
                 match ASTNode::parse(&query) {
                     Ok(ast) => {
+                        println!("ast: {:?}", ast);
                         let start = time::precise_time_s();
                         let res = Filter::new(&db, &ast, 12).execute();
                         println!("duration: {}", time::precise_time_s() - start);

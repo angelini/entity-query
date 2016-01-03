@@ -1,4 +1,3 @@
-use data::Datum;
 use grammar;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -12,7 +11,7 @@ pub enum Comparator {
 }
 
 impl Comparator {
-    fn test_int(&self, left: usize, right: usize) -> bool {
+    pub fn test_int(&self, left: usize, right: usize) -> bool {
         match *self {
             Comparator::Equal => left == right,
             Comparator::Greater => left > right,
@@ -23,7 +22,7 @@ impl Comparator {
         }
     }
 
-    fn test_str(&self, left: &str, right: &str) -> bool {
+    pub fn test_str(&self, left: &str, right: &str) -> bool {
         match *self {
             Comparator::Contains => left.contains(right),
             Comparator::Equal => left == right,
@@ -37,10 +36,10 @@ impl Comparator {
 
 #[derive(Debug, Clone)]
 pub struct Predicates {
-    e: Option<(usize, Comparator)>,
-    a: Option<(String, Comparator)>,
-    v: Option<(String, Comparator)>,
-    t: Option<(usize, Comparator)>,
+    pub e: Option<(usize, Comparator)>,
+    pub a: Option<(String, Comparator)>,
+    pub v: Option<(String, Comparator)>,
+    pub t: Option<(usize, Comparator)>,
 }
 
 #[derive(Debug, Clone)]
@@ -96,39 +95,6 @@ impl ASTNode {
                 v: v,
                 t: t,
             })
-        }
-    }
-
-
-    pub fn eval(&self, datum: &Datum) -> bool {
-        match *self {
-            ASTNode::True => true,
-            ASTNode::Expression(ref preds) => {
-                let e_pred = match preds.e {
-                    Some((v, ref comp)) => comp.test_int(datum.e, v),
-                    None => true,
-                };
-                let a_pred = match preds.a {
-                    Some((ref v, ref comp)) => comp.test_str(&datum.a, &v),
-                    None => true,
-                };
-                let v_pred = match preds.v {
-                    Some((ref v, ref comp)) => comp.test_str(&datum.v, &v),
-                    None => true,
-                };
-                let t_pred = match preds.t {
-                    Some((v, ref comp)) => comp.test_int(datum.t, v),
-                    None => true,
-                };
-                e_pred && a_pred && v_pred && t_pred
-            }
-            ASTNode::Join(ref preds, ref child) => {
-                unimplemented!()
-            }
-            ASTNode::CachedJoin(ref preds, cache_idx) => {
-                unimplemented!()
-            }
-            ASTNode::Or(ref l, ref r) => l.eval(datum) || r.eval(datum),
         }
     }
 }
