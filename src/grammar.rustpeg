@@ -25,4 +25,5 @@ pred_name -> String
   = [eavt] { match_str.to_owned() }
 
 pred_val -> String
-  = [a-zA-Z0-9_/]+ { match_str.to_owned() }
+  = [\"'] [a-zA-Z0-9_/ ]+ [\"'] { match_str.trim_matches(|c| c == '\'' || c == '"').to_owned() }
+  / [a-zA-Z0-9_/]+ { match_str.to_owned() }

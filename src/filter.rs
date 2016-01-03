@@ -155,9 +155,7 @@ fn eval(ast: &ASTNode, cache: &Cache, datum: &Datum) -> bool {
                 None => true,
             };
             let a_pred = match preds.a {
-                Some((ref v, ref comp)) => {
-                    comp.test_str(&datum.a, &v)
-                }
+                Some((ref v, ref comp)) => comp.test_str(&datum.a, &v),
                 None => true,
             };
             let v_pred = match preds.v {
