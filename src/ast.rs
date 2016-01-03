@@ -34,7 +34,7 @@ impl Comparator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Predicates {
     pub e: Option<(usize, Comparator)>,
     pub a: Option<(String, Comparator)>,
@@ -42,7 +42,7 @@ pub struct Predicates {
     pub t: Option<(usize, Comparator)>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ASTNode {
     True,
     Or(Box<ASTNode>, Box<ASTNode>),
@@ -95,6 +95,90 @@ impl ASTNode {
                 v: v,
                 t: t,
             })
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ASTNode, Predicates, Comparator};
+
+    #[test]
+    fn parse_truthy() {
+        let qs = [" ", "", "   "];
+        let ast = ASTNode::True;
+
+        for q in &qs {
+            assert_eq!(ast, ASTNode::parse(q).unwrap());
+        }
+    }
+
+    #[test]
+    fn parse_id_equality() {
+        let qs = ["e=1", "   e=1 ", "e=1  "];
+        let ast = ASTNode::Expression(Predicates {
+            e: Some((1, Comparator::Equal)),
+            a: None,
+            v: None,
+            t: None,
+        });
+
+        for q in &qs {
+            assert_eq!(ast, ASTNode::parse(q).unwrap());
+        }
+    }
+
+    #[test]
+    fn parse_multiple_predicates() {
+        let qs = ["a=foo e=3 t=1  v=bar", " v=bar  t=1 ", "e=1 a=foo"];
+        let asts = [ASTNode::Expression(Predicates {
+                        e: Some((3, Comparator::Equal)),
+                        a: Some(("foo".to_owned(), Comparator::Equal)),
+                        v: Some(("bar".to_owned(), Comparator::Equal)),
+                        t: Some((1, Comparator::Equal)),
+                    }),
+                    ASTNode::Expression(Predicates {
+                        e: None,
+                        a: None,
+                        v: Some(("bar".to_owned(), Comparator::Equal)),
+                        t: Some((1, Comparator::Equal)),
+                    }),
+                    ASTNode::Expression(Predicates {
+                        e: Some((1, Comparator::Equal)),
+                        a: Some(("foo".to_owned(), Comparator::Equal)),
+                        v: None,
+                        t: None,
+                    })];
+
+        for (i, q) in qs.iter().enumerate() {
+            assert_eq!(asts[i], ASTNode::parse(q).unwrap());
+        }
+    }
+
+    #[test]
+    fn parse_operators() {
+        let qs = ["  a:foo e>=3 t<1 v<=bar ", "t>=1   e<1", "v:bar a>=foo "];
+        let asts = [ASTNode::Expression(Predicates {
+                        e: Some((3, Comparator::GreaterOrEqual)),
+                        a: Some(("foo".to_owned(), Comparator::Contains)),
+                        v: Some(("bar".to_owned(), Comparator::LessOrEqual)),
+                        t: Some((1, Comparator::Less)),
+                    }),
+                    ASTNode::Expression(Predicates {
+                        e: Some((1, Comparator::Less)),
+                        a: None,
+                        v: None,
+                        t: Some((1, Comparator::GreaterOrEqual)),
+                    }),
+                    ASTNode::Expression(Predicates {
+                        e: None,
+                        a: Some(("foo".to_owned(), Comparator::GreaterOrEqual)),
+                        v: Some(("bar".to_owned(), Comparator::Contains)),
+                        t: None,
+                    })];
+
+        for (i, q) in qs.iter().enumerate() {
+            assert_eq!(asts[i], ASTNode::parse(q).unwrap());
         }
     }
 }

@@ -2,15 +2,15 @@ use ast::{ASTNode, Comparator};
 
 #[pub]
 ast -> ASTNode
-  = e1:expr " "+ "|" " "+ e2:ast { ASTNode::Or(Box::new(e1), Box::new(e2)) }
-  / e:expr { e }
-  / " "* { ASTNode::True }
+  = __ e1:expr __ " | " __ e2:ast __ { ASTNode::Or(Box::new(e1), Box::new(e2)) }
+  / __ e:expr __ { e }
+  / __ { ASTNode::True }
 
 expr -> ASTNode
   = p:preds { ASTNode::from_parser(p) }
 
 preds -> Vec<(String, String, Option<ASTNode>, Comparator)>
-  = p:pred ++ " " { p }
+  = p:pred ++ __ { p }
 
 pred -> (String, String, Option<ASTNode>, Comparator)
   = "e:(" q:ast ")" { ("e".to_owned(), "".to_owned(), Some(q), Comparator::Contains) }
@@ -27,3 +27,5 @@ pred_name -> String
 pred_val -> String
   = [\"'] [a-zA-Z0-9_/ ]+ [\"'] { match_str.trim_matches(|c| c == '\'' || c == '"').to_owned() }
   / [a-zA-Z0-9_/]+ { match_str.to_owned() }
+
+__ = " "*
