@@ -24,18 +24,22 @@ mod filter;
 mod csv_parser;
 
 use std::process;
-use data::DB;
+use scoped_threadpool::Pool;
+
 use ast::ASTNode;
 use cli::CLICommand;
-use filter::Filter;
 use csv_parser::CSVParser;
+use data::DB;
+use filter::Filter;
 
 peg_file! grammar("grammar.rustpeg");
 
 fn main() {
     linenoise::history_set_max_len(1000);
     linenoise::history_load(".history");
+
     let mut db = DB::new();
+    let mut pool = Pool::new(12);
 
     loop {
         println!("size: {}", db.datums.len());
@@ -45,7 +49,7 @@ fn main() {
                     Ok(ast) => {
                         println!("ast: {:?}", ast);
                         let start = time::precise_time_s();
-                        let res = Filter::new(&db, &ast, 12).execute();
+                        let res = Filter::new(&db, &mut pool).execute(&ast);
                         println!("duration: {}", time::precise_time_s() - start);
                         println!("len: {}", res.datums.len());
                         println!("{}", res)
@@ -70,7 +74,7 @@ fn main() {
                 let start = time::precise_time_s();
                 let parser = CSVParser::new(&filename, &entity, &time, &joins);
 
-                match parser.parse(&db) {
+                match parser.parse(&db, &mut pool) {
                     Ok((datums, refs, offset)) => {
                         println!("new: {}", datums.len());
                         db.datums.extend(datums);

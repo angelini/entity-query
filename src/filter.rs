@@ -1,69 +1,35 @@
 use std::sync::mpsc::channel;
 use scoped_threadpool::Pool;
+
 use ast::{ASTNode, Comparator};
 use data::{Datum, DB, DBView};
 
 pub struct Filter<'a> {
-    threads: usize,
     db: &'a DB,
-    ast: &'a ASTNode,
+    pool: &'a mut Pool,
 }
 
 impl<'a> Filter<'a> {
-    pub fn new(db: &'a DB, ast: &'a ASTNode, threads: usize) -> Filter<'a> {
+    pub fn new(db: &'a DB, pool: &'a mut Pool) -> Filter<'a> {
         Filter {
-            threads: threads,
             db: db,
-            ast: ast,
+            pool: pool,
         }
     }
 
-    pub fn execute(self) -> DBView<'a> {
-        let plan = Plan::new(&self.ast);
-        let mut pool = Pool::new(self.threads as u32);
+    pub fn execute(self, ast: &ASTNode) -> DBView<'a> {
+        let plan = Plan::new(ast);
         let mut cache = Cache { executions: vec![] };
 
         for (i, step) in plan.steps.iter().enumerate() {
             if i < plan.steps.len() - 1 {
-                let from_eids = Self::extract_eids(self.run_step(step, &cache, &mut pool));
+                let from_datums = Self::run_step(self.db, self.pool, &cache, step);
+                let from_eids = Self::extract_eids(from_datums);
                 cache.executions.push(self.translate_eids(from_eids));
             }
         }
 
-        DBView { datums: self.run_step(plan.steps.last().unwrap(), &cache, &mut pool) }
-    }
-
-    fn run_step(&self, ast: &ASTNode, cache: &Cache, pool: &mut Pool) -> Vec<&'a Datum> {
-        let size = self.db.datums.len() / self.threads;
-        let (tx, rx) = channel();
-
-        pool.scoped(|scoped| {
-            for i in 0..self.threads {
-                let start = i * size;
-                let stop = if i == (self.threads - 1) {
-                    self.db.datums.len()
-                } else {
-                    i * size + size
-                };
-
-                let thread_tx = tx.clone();
-                let thread_ast = ast.clone();
-                let slice: &'a [Datum] = &self.db.datums[start..stop];
-
-                scoped.execute(move || {
-                    let results = slice.iter()
-                                       .filter(|d| eval(&thread_ast, cache, d))
-                                       .collect::<Vec<&Datum>>();
-                    thread_tx.send(results).unwrap();
-                })
-            }
-        });
-
-        let mut results: Vec<&Datum> = vec![];
-        for _ in 0..self.threads {
-            results.extend(rx.recv().unwrap())
-        }
-        results
+        DBView { datums: Self::run_step(self.db, self.pool, &cache, plan.steps.last().unwrap()) }
     }
 
     fn translate_eids(&self, eids: Vec<usize>) -> Vec<usize> {
@@ -85,6 +51,36 @@ impl<'a> Filter<'a> {
             .collect()
     }
 
+    fn run_step(db: &'a DB, pool: &mut Pool, cache: &Cache, ast: &ASTNode) -> Vec<&'a Datum> {
+        let db_size = db.datums.len();
+        let threads = pool.thread_count() as usize;
+        let size = db.datums.len() / threads;
+        let (tx, rx) = channel();
+
+        pool.scoped(|scoped| {
+            for i in 0..threads {
+                let start = i * size;
+                let stop = if i == (threads - 1) { db_size } else { i * size + size };
+
+                let thread_tx = tx.clone();
+                let thread_ast = ast.clone();
+                let slice: &'a [Datum] = &db.datums[start..stop];
+
+                scoped.execute(move || {
+                    let results = slice.iter()
+                                       .filter(|d| eval(&thread_ast, cache, d))
+                                       .collect::<Vec<&Datum>>();
+                    thread_tx.send(results).unwrap();
+                })
+            }
+        });
+
+        let mut results: Vec<&Datum> = vec![];
+        for _ in 0..threads {
+            results.extend(rx.recv().unwrap())
+        }
+        results
+    }
 
     fn extract_eids(datums: Vec<&Datum>) -> Vec<usize> {
         let mut eids: Vec<usize> = datums.into_iter().map(|d| d.e).collect::<Vec<usize>>();

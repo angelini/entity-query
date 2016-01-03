@@ -1,4 +1,6 @@
 use csv;
+use scoped_threadpool::Pool;
+
 use ast::ASTNode;
 use cli::Join;
 use data::{Datum, DB, Ref, LoadError};
@@ -22,7 +24,7 @@ impl<'a> CSVParser<'a> {
         }
     }
 
-    pub fn parse(self, db: &DB) -> Result<(Vec<Datum>, Vec<Ref>, usize), LoadError> {
+    pub fn parse(self, db: &DB, pool: &mut Pool) -> Result<(Vec<Datum>, Vec<Ref>, usize), LoadError> {
         let mut rdr = match csv::Reader::from_file(self.filename) {
             Ok(rdr) => rdr,
             Err(e) => {
@@ -59,12 +61,12 @@ impl<'a> CSVParser<'a> {
             Err(e) => return Err(e),
         };
 
-        let refs = self.find_refs(&datums, db);
+        let refs = self.find_refs(&datums, &db, pool);
         Ok((datums, refs, eid))
     }
 
     // TODO: Sort both datasets first and do a streaming join
-    fn find_refs(&self, datums: &[Datum], db: &DB) -> Vec<Ref> {
+    fn find_refs(&self, datums: &[Datum], db: &DB, pool: &mut Pool) -> Vec<Ref> {
         self.joins
             .iter()
             .flat_map(|join| {
@@ -76,7 +78,7 @@ impl<'a> CSVParser<'a> {
                                        .filter(|d| d.a == attribute)
                                        .cloned()
                                        .collect::<Vec<Datum>>();
-                let old_datums = Filter::new(db, &ast, 12).execute().datums;
+                let old_datums = Filter::new(&db, pool).execute(&ast).datums;
 
                 new_datums.iter()
                           .map(|new| {
