@@ -181,4 +181,65 @@ mod tests {
             assert_eq!(asts[i], ASTNode::parse(q).unwrap());
         }
     }
+
+    #[test]
+    fn parse_joins() {
+        let qs = ["e:(a=foo/bar v=baz)", " e:(e=1)  a:other t=1 "];
+        let asts = [ASTNode::Join(Predicates {
+                                      e: Some((0, Comparator::Contains)),
+                                      a: None,
+                                      v: None,
+                                      t: None,
+                                  },
+                                  Box::new(ASTNode::Expression(Predicates {
+                                      e: None,
+                                      a: Some(("foo/bar".to_owned(), Comparator::Equal)),
+                                      v: Some(("baz".to_owned(), Comparator::Equal)),
+                                      t: None,
+                                  }))),
+                    ASTNode::Join(Predicates {
+                                      e: Some((0, Comparator::Contains)),
+                                      a: Some(("other".to_owned(), Comparator::Contains)),
+                                      v: None,
+                                      t: Some((1, Comparator::Equal)),
+                                  },
+                                  Box::new(ASTNode::Expression(Predicates {
+                                      e: Some((1, Comparator::Equal)),
+                                      a: None,
+                                      v: None,
+                                      t: None,
+                                  })))];
+
+        for (i, q) in qs.iter().enumerate() {
+            assert_eq!(asts[i], ASTNode::parse(q).unwrap());
+        }
+    }
+
+    #[test]
+    fn parse_nested_joins() {
+        let q = "e:(e:(a=foo/bar v=baz) a:inside t>10) a:other";
+        let ast =
+            ASTNode::Join(Predicates {
+                              e: Some((0, Comparator::Contains)),
+                              a: Some(("other".to_owned(), Comparator::Contains)),
+                              v: None,
+                              t: None,
+                          },
+                          Box::new(ASTNode::Join(Predicates {
+                                                     e: Some((0, Comparator::Contains)),
+                                                     a: Some(("inside".to_owned(),
+                                                              Comparator::Contains)),
+                                                     v: None,
+                                                     t: Some((10, Comparator::Greater)),
+                                                 },
+                                                 Box::new(ASTNode::Expression(Predicates {
+                                                     e: None,
+                                                     a: Some(("foo/bar".to_owned(),
+                                                              Comparator::Equal)),
+                                                     v: Some(("baz".to_owned(), Comparator::Equal)),
+                                                     t: None,
+                                                 })))));
+
+        assert_eq!(ast, ASTNode::parse(q).unwrap());
+    }
 }
