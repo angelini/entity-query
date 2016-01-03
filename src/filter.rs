@@ -147,14 +147,14 @@ fn eval(ast: &ASTNode, cache: &Cache, datum: &Datum) -> bool {
 
 fn test_predicate(pred: &Option<(usize, Comparator)>, datum_val: usize) -> bool {
     match *pred {
-        Some((v, ref comp)) => comp.test_int(v, datum_val),
+        Some((v, ref comp)) => comp.test_int(datum_val, v),
         None => true,
     }
 }
 
 fn test_predicate_with_contains(pred: &Option<(String, Comparator)>, datum_val: &str) -> bool {
     match *pred {
-        Some((ref v, ref comp)) => comp.test_str(&v, datum_val),
+        Some((ref v, ref comp)) => comp.test_str(datum_val, &v),
         None => true,
     }
 }
