@@ -1,6 +1,6 @@
 use std::sync::mpsc::channel;
 use scoped_threadpool::Pool;
-use ast::ASTNode;
+use ast::{ASTNode, Comparator};
 use data::{Datum, DB, DBView};
 
 pub struct Filter<'a> {
@@ -66,13 +66,6 @@ impl<'a> Filter<'a> {
         results
     }
 
-    fn extract_eids(datums: Vec<&Datum>) -> Vec<usize> {
-        let mut eids: Vec<usize> = datums.into_iter().map(|d| d.e).collect::<Vec<usize>>();
-        eids.sort();
-        eids.dedup();
-        eids
-    }
-
     fn translate_eids(&self, eids: Vec<usize>) -> Vec<usize> {
         self.db
             .refs
@@ -90,6 +83,14 @@ impl<'a> Filter<'a> {
             .filter(|db_ref| db_ref.is_some())
             .map(|db_ref| db_ref.unwrap())
             .collect()
+    }
+
+
+    fn extract_eids(datums: Vec<&Datum>) -> Vec<usize> {
+        let mut eids: Vec<usize> = datums.into_iter().map(|d| d.e).collect::<Vec<usize>>();
+        eids.sort();
+        eids.dedup();
+        eids
     }
 }
 
@@ -128,47 +129,39 @@ fn eval(ast: &ASTNode, cache: &Cache, datum: &Datum) -> bool {
     match *ast {
         ASTNode::True => true,
         ASTNode::Expression(ref preds) => {
-            let e_pred = match preds.e {
-                Some((v, ref comp)) => comp.test_int(datum.e, v),
-                None => true,
-            };
-            let a_pred = match preds.a {
-                Some((ref v, ref comp)) => comp.test_str(&datum.a, &v),
-                None => true,
-            };
-            let v_pred = match preds.v {
-                Some((ref v, ref comp)) => comp.test_str(&datum.v, &v),
-                None => true,
-            };
-            let t_pred = match preds.t {
-                Some((v, ref comp)) => comp.test_int(datum.t, v),
-                None => true,
-            };
-            e_pred && a_pred && v_pred && t_pred
+            test_predicate(&preds.e, datum.e) && test_predicate_with_contains(&preds.a, &datum.a) &&
+            test_predicate_with_contains(&preds.v, &datum.v) &&
+            test_predicate(&preds.t, datum.t)
         }
+
         ASTNode::CachedJoin(ref preds, cache_idx) => {
-            let e_pred = match preds.e {
-                Some((_, _)) => {
-                    let eids = &cache.executions[cache_idx];
-                    eids.contains(&datum.e)
-                }
-                None => true,
-            };
-            let a_pred = match preds.a {
-                Some((ref v, ref comp)) => comp.test_str(&datum.a, &v),
-                None => true,
-            };
-            let v_pred = match preds.v {
-                Some((ref v, ref comp)) => comp.test_str(&datum.v, &v),
-                None => true,
-            };
-            let t_pred = match preds.t {
-                Some((v, ref comp)) => comp.test_int(datum.t, v),
-                None => true,
-            };
-            e_pred && a_pred && v_pred && t_pred
+            test_join_predicate(&preds.e, &cache.executions[cache_idx], datum.e) &&
+            test_predicate_with_contains(&preds.a, &datum.a) &&
+            test_predicate_with_contains(&preds.v, &datum.v) &&
+            test_predicate(&preds.t, datum.t)
         }
         ASTNode::Or(ref l, ref r) => eval(l, cache, datum) || eval(r, cache, datum),
         ASTNode::Join(_, _) => unimplemented!(),
+    }
+}
+
+fn test_predicate(pred: &Option<(usize, Comparator)>, datum_val: usize) -> bool {
+    match *pred {
+        Some((v, ref comp)) => comp.test_int(v, datum_val),
+        None => true,
+    }
+}
+
+fn test_predicate_with_contains(pred: &Option<(String, Comparator)>, datum_val: &str) -> bool {
+    match *pred {
+        Some((ref v, ref comp)) => comp.test_str(&v, datum_val),
+        None => true,
+    }
+}
+
+fn test_join_predicate(pred: &Option<(usize, Comparator)>, eids: &[usize], datum_val: usize) -> bool {
+    match *pred {
+        Some(_) => eids.contains(&datum_val),
+        None => true,
     }
 }
