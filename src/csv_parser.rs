@@ -40,7 +40,7 @@ impl<'a> CsvParser<'a> {
         let mut eid = db.offset;
         let datums_res = rdr.records()
                             .map(|row_res| {
-                                let row = row_res.unwrap();
+                                let row = try!(row_res);
                                 eid += 1;
                                 let datums = try!(Self::parse_row(row,
                                                                   &headers,
@@ -60,28 +60,32 @@ impl<'a> CsvParser<'a> {
         Ok((datums, refs, eid))
     }
 
-    // TODO: Sort both datasets first and do a streaming join
     fn find_refs(&self, datums: &[Datum], db: &Db, pool: &mut Pool) -> Vec<Ref> {
         self.joins
             .iter()
             .flat_map(|join| {
                 let (column, query) = (&join.0, &join.1);
                 let attribute = format!("{}/{}", self.entity, robotize(&column));
-                println!("before: {}", true);
                 let ast = AstNode::parse(&query).unwrap();
-                println!("after: {}", true);
 
-                let new_datums = datums.iter()
+                let mut new_datums = datums.iter()
                                        .filter(|d| d.a == attribute)
                                        .cloned()
                                        .collect::<Vec<Datum>>();
-                let old_datums = Filter::new(&db, pool).execute(&ast).datums;
+                let mut old_datums = Filter::new(&db, pool).execute(&ast).datums;
+
+                let mut old_idx = 0;
+                new_datums.sort_by(|l, r| l.v.cmp(&r.v));
+                old_datums.sort_by(|l, r| l.v.cmp(&r.v));
 
                 new_datums.iter()
                           .map(|new| {
                               let new_entity = new.a.split('/').next().unwrap();
-                              match old_datums.iter().find(|o| o.v == new.v) {
-                                  Some(old) => {
+                              let old_datums_left = old_datums[old_idx..].iter();
+
+                              match old_datums_left.enumerate().find(|&(_, o)| o.v == new.v) {
+                                  Some((i, old)) => {
+                                      old_idx = i;
                                       let old_entity = old.a.split('/').next().unwrap();
                                       Some(Ref::new(new.e,
                                                     format!("{}/{}", new_entity, old_entity),
