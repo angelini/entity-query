@@ -161,3 +161,50 @@ fn test_join_predicate(pred: &Option<(usize, Comparator)>, eids: &[usize], datum
         None => true,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Filter;
+    use ast::AstNode;
+    use data::{Db, Datum};
+    use scoped_threadpool::Pool;
+
+    fn exec(datums: Vec<Datum>, ast: AstNode) -> Vec<Datum> {
+        let mut pool = Pool::new(1);
+        let db = Db {
+            offset: datums.len(),
+            datums: datums,
+            refs: vec![],
+        };
+        Filter::new(&db, &mut pool).execute(&ast).datums.into_iter().cloned().collect()
+    }
+
+    #[test]
+    fn execute_truthy() {
+        let data = vec![Datum::new(1, "foo/bar", "baz", 1)];
+        assert_eq!(data, exec(data.clone(), AstNode::True))
+    }
+
+    #[test]
+    fn execute_id_equality() {
+        let ast = AstNode::parse("e=1").unwrap();
+        let data = vec![Datum::new(1, "foo/bar", "baz", 1), Datum::new(2, "foo/bar", "baz", 2)];
+        assert_eq!(data[..1], exec(data.clone(), ast)[..])
+    }
+
+    #[test]
+    fn execute_multiple_predicates() {
+        let ast = AstNode::parse("e=1 a=foo v=baz t=1").unwrap();
+        let data = vec![Datum::new(1, "foo", "baz", 1), Datum::new(1, "bar", "baz", 2)];
+        assert_eq!(data[..1], exec(data.clone(), ast)[..])
+    }
+
+    #[test]
+    fn execute_operators() {
+        let ast = AstNode::parse("a:foo t>=2").unwrap();
+        let data = vec![Datum::new(1, "foobar", "baz", 3),
+                        Datum::new(1, "barfoo", "baz", 2),
+                        Datum::new(1, "foobar", "baz", 1)];
+        assert_eq!(data[..2], exec(data.clone(), ast)[..])
+    }
+}

@@ -19,11 +19,13 @@ pub struct Datum {
 }
 
 impl Datum {
-    pub fn new(e: usize, a: String, v: String, t: usize) -> Datum {
+    pub fn new<S>(e: usize, a: S, v: S, t: usize) -> Datum
+        where S: Into<String>
+    {
         Datum {
             e: e,
-            a: a,
-            v: v,
+            a: a.into(),
+            v: v.into(),
             t: t,
         }
     }
@@ -103,7 +105,7 @@ impl Db {
     pub fn write(&self, filename: &str) -> Result<(), Error> {
         let path = path::Path::new(filename);
         if path.exists() {
-            return Err(Error::Io(io::Error::new(io::ErrorKind::AlreadyExists, filename)))
+            return Err(Error::Io(io::Error::new(io::ErrorKind::AlreadyExists, filename)));
         }
 
         let writer = io::BufWriter::new(File::create(path).unwrap());
