@@ -4,6 +4,9 @@ from random import randint
 
 faker = Factory.create();
 
+def clean(s):
+    return str(s).replace('.', '').replace(',', '')
+
 def gen_data(suffix, artist_count, album_count, track_count):
     artists = [(faker.name(), faker.year()) for _ in range(artist_count)]
 
@@ -21,17 +24,17 @@ def gen_data(suffix, artist_count, album_count, track_count):
     with open('data/artists{}.csv'.format(suffix), 'w') as f:
         f.write('Name,Year\n')
         for artist in artists:
-            f.write(','.join(map(str, artist)) + '\n')
+            f.write(','.join(map(clean, artist)) + '\n')
 
     with open('data/albums{}.csv'.format(suffix), 'w') as f:
         f.write('Name,Artist,Tracks,Label,Year\n')
         for album in albums:
-            f.write(','.join(map(str, album)) + '\n')
+            f.write(','.join(map(clean, album)) + '\n')
 
     with open('data/tracks{}.csv'.format(suffix), 'w') as f:
         f.write('Name,Artist,Album,Length,Year\n')
         for track in tracks:
-            f.write(','.join(map(str, track)) + '\n')
+            f.write(','.join(map(clean, track)) + '\n')
 
 if __name__ == '__main__':
     parser = ArgumentParser()
