@@ -1,5 +1,6 @@
 use csv;
 use scoped_threadpool::Pool;
+use std::collections::HashMap;
 
 use ast::AstNode;
 use cli::Join;
@@ -32,9 +33,7 @@ impl<'a> CsvParser<'a> {
                                       .enumerate()
                                       .find(|&(_, h)| h == self.time) {
             Some((idx, _)) => idx,
-            None => {
-                return Err(Error::MissingTimeHeader(self.time.to_owned()))
-            }
+            None => return Err(Error::MissingTimeHeader(self.time.to_owned())),
         };
 
         let mut eid = db.offset;
@@ -65,50 +64,56 @@ impl<'a> CsvParser<'a> {
             .iter()
             .flat_map(|join| {
                 let (column, query) = (&join.0, &join.1);
-                let attribute = format!("{}/{}", self.entity, robotize(&column));
-                let ast = AstNode::parse(&query).unwrap();
-
-                let mut new_datums = datums.iter()
-                                       .filter(|d| d.a == attribute)
-                                       .cloned()
-                                       .collect::<Vec<Datum>>();
-                let mut old_datums = Filter::new(&db, pool).execute(&ast).datums;
-
-                let mut old_idx = 0;
-                new_datums.sort_by(|l, r| l.v.cmp(&r.v));
-                old_datums.sort_by(|l, r| l.v.cmp(&r.v));
-
-                new_datums.iter()
-                          .map(|new| {
-                              let new_entity = new.a.split('/').next().unwrap();
-                              let old_datums_left = old_datums[old_idx..].iter();
-
-                              match old_datums_left.enumerate().find(|&(_, o)| o.v == new.v) {
-                                  Some((i, old)) => {
-                                      old_idx = i;
-                                      let old_entity = old.a.split('/').next().unwrap();
-                                      Some(Ref::new(new.e,
-                                                    format!("{}/{}", new_entity, old_entity),
-                                                    old.e,
-                                                    new.t))
-                                  }
-                                  None => None,
-                              }
-                          })
-                          .filter(|o| o.is_some())
-                          .map(|o| o.unwrap())
-                          .collect::<Vec<Ref>>()
+                let filter = Filter::new(&db, pool);
+                self.find_refs_for_join(datums, column, query, filter)
             })
             .collect::<Vec<Ref>>()
+    }
+
+    fn find_refs_for_join(&self, datums: &[Datum], column: &str, query: &str, filter: Filter)
+                          -> Vec<Ref> {
+        let attribute = format!("{}/{}", self.entity, robotize(&column));
+        let ast = AstNode::parse(&query).unwrap();
+
+        let new_datums = datums.iter()
+                               .filter(|d| d.a == attribute)
+                               .cloned()
+                               .collect::<Vec<Datum>>();
+        let old_datums = filter.execute(&ast).datums;
+
+        let index = index_by_value(old_datums);
+
+        new_datums.iter()
+                  .flat_map(|new| {
+                      let new_entity = new.a.split('/').next().unwrap();
+
+                      match index.get(new.v.as_str()) {
+                          Some(old_matches) => {
+                              old_matches.iter()
+                                         .map(|old| {
+                                             let old_entity = old.a.split('/').next().unwrap();
+                                             Some(Ref::new(new.e,
+                                                           format!("{}/{}",
+                                                                   new_entity,
+                                                                   old_entity),
+                                                           old.e,
+                                                           new.t))
+                                         })
+                                         .collect()
+                          }
+                          None => vec![None],
+                      }
+                  })
+                  .filter(|o| o.is_some())
+                  .map(|o| o.unwrap())
+                  .collect::<Vec<Ref>>()
     }
 
     fn parse_row(row: Vec<String>, headers: &[String], time_index: usize, eid: usize, entity: &str)
                  -> Result<Vec<Datum>, Error> {
         let time = match row[time_index].parse::<usize>() {
             Ok(t) => t,
-            Err(_) => {
-                return Err(Error::TimeColumnTypeError(row[time_index].to_owned()))
-            }
+            Err(_) => return Err(Error::TimeColumnTypeError(row[time_index].to_owned())),
         };
         let datums = headers.iter()
                             .enumerate()
@@ -129,4 +134,14 @@ impl<'a> CsvParser<'a> {
 fn robotize(string: &str) -> String {
     string.replace(" ", "_")
           .to_lowercase()
+}
+
+fn index_by_value(datums: Vec<&Datum>) -> HashMap<&str, Vec<&Datum>> {
+    let mut index = HashMap::new();
+    for datum in datums {
+        if let Some(mut foo) = index.insert(datum.v.as_str(), vec![datum]) {
+            foo.push(datum)
+        }
+    }
+    index
 }

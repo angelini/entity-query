@@ -3,6 +3,7 @@
 // extern crate alloc_system;
 
 #![feature(plugin)]
+#![feature(convert)]
 #![plugin(regex_macros)]
 #![plugin(peg_syntax_ext)]
 #![plugin(clippy)]
