@@ -4,9 +4,9 @@ use linenoise;
 pub struct Join(pub String, pub String);
 
 #[derive(Debug)]
-pub enum CLICommand {
+pub enum CliCommand {
     Load(String),
-    LoadCSV(String, String, String, Vec<Join>),
+    LoadCsv(String, String, String, Vec<Join>),
     Query(String),
     Write(String),
     Empty,
@@ -15,16 +15,16 @@ pub enum CLICommand {
 }
 
 #[derive(Debug)]
-pub enum ParseError {
-    InvalidCommand(String),
+pub enum CliError {
+    UnknownCommand(String),
     InvalidArgs(String),
     InvalidJoinClause(String),
 }
 
-pub fn read() -> Result<CLICommand, ParseError> {
+pub fn read() -> Result<CliCommand, CliError> {
     let input = match linenoise::input("> ") {
         Some(i) => i,
-        None => return Ok(CLICommand::None),
+        None => return Ok(CliCommand::None),
     };
 
     // Save before adding to the history to avoid saving the last "exit"
@@ -32,7 +32,7 @@ pub fn read() -> Result<CLICommand, ParseError> {
     linenoise::history_add(&input);
 
     if input == "" {
-        return Ok(CLICommand::None);
+        return Ok(CliCommand::None);
     }
 
     let split = input.split(" ").collect::<Vec<&str>>();
@@ -41,26 +41,26 @@ pub fn read() -> Result<CLICommand, ParseError> {
     let all_args = args.join(" ");
 
     match command {
-        "l" => Ok(CLICommand::Load(all_args)),
+        "l" => Ok(CliCommand::Load(all_args)),
         "c" => {
             if args.len() >= 3 {
-                Ok(CLICommand::LoadCSV((*args.get(0).unwrap()).to_owned(),
+                Ok(CliCommand::LoadCsv((*args.get(0).unwrap()).to_owned(),
                                        (*args.get(1).unwrap()).to_owned(),
                                        (*args.get(2).unwrap()).to_owned(),
                                        try!(parse_joins(&args[3..].join(" ")))))
             } else {
-                Err(ParseError::InvalidArgs(all_args))
+                Err(CliError::InvalidArgs(all_args))
             }
         }
-        "q" => Ok(CLICommand::Query(all_args)),
-        "w" => Ok(CLICommand::Write(all_args)),
-        "empty" => Ok(CLICommand::Empty),
+        "q" => Ok(CliCommand::Query(all_args)),
+        "w" => Ok(CliCommand::Write(all_args)),
+        "empty" => Ok(CliCommand::Empty),
         "clear" => {
             linenoise::clear_screen();
-            Ok(CLICommand::None)
+            Ok(CliCommand::None)
         }
-        "exit" => Ok(CLICommand::Exit),
-        _ => Err(ParseError::InvalidCommand(command.to_owned())),
+        "exit" => Ok(CliCommand::Exit),
+        _ => Err(CliError::UnknownCommand(command.to_owned())),
     }
 }
 
@@ -68,7 +68,7 @@ pub fn read() -> Result<CLICommand, ParseError> {
 // c data/albums.csv album Year join(Artist, "a=artist/name")
 // c data/tracks.csv track Year join(Artist, "a=artist/name") join(Album, "a=album/name")
 
-fn parse_joins(raw: &str) -> Result<Vec<Join>, ParseError> {
+fn parse_joins(raw: &str) -> Result<Vec<Join>, CliError> {
     let join_re = regex!(r#"(\S+),\s+"(.*)"\)"#);
 
     raw.split("join(")
@@ -79,7 +79,7 @@ fn parse_joins(raw: &str) -> Result<Vec<Join>, ParseError> {
                Ok(Join(caps.at(1).unwrap().to_owned(),
                        caps.at(2).unwrap().to_owned()))
            } else {
-               Err(ParseError::InvalidJoinClause(clause.to_owned()))
+               Err(CliError::InvalidJoinClause(clause.to_owned()))
            }
        })
        .collect()

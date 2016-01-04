@@ -61,14 +61,14 @@ impl fmt::Display for Ref {
 }
 
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable, PartialEq)]
-pub struct DB {
+pub struct Db {
     pub datums: Vec<Datum>,
     pub refs: Vec<Ref>,
     pub offset: usize,
 }
 
 #[derive(Debug)]
-pub struct DBView<'a> {
+pub struct DbView<'a> {
     pub datums: Vec<&'a Datum>,
 }
 
@@ -82,16 +82,16 @@ pub enum Error {
     MissingTimeHeader(String),
 }
 
-impl DB {
-    pub fn new() -> DB {
-        DB {
+impl Db {
+    pub fn new() -> Db {
+        Db {
             datums: vec![],
             refs: vec![],
             offset: 0,
         }
     }
 
-    pub fn from_file(filename: &str) -> Result<DB, Error> {
+    pub fn from_file(filename: &str) -> Result<Db, Error> {
         let file = try!(File::open(filename));
         let reader = io::BufReader::new(file);
         let mut decoder = ZlibDecoder::new(reader);
@@ -114,7 +114,7 @@ impl DB {
     }
 }
 
-impl fmt::Display for DB {
+impl fmt::Display for Db {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         try!(write!(f, "datums:\n"));
         try!(display_datums(&self.datums.iter().collect::<Vec<&Datum>>(), f, 20));
@@ -123,7 +123,7 @@ impl fmt::Display for DB {
     }
 }
 
-impl<'a> fmt::Display for DBView<'a> {
+impl<'a> fmt::Display for DbView<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         display_datums(&self.datums, f, 20)
     }

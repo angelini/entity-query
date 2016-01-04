@@ -26,10 +26,10 @@ mod csv_parser;
 use std::process;
 use scoped_threadpool::Pool;
 
-use ast::ASTNode;
-use cli::CLICommand;
-use csv_parser::CSVParser;
-use data::DB;
+use ast::AstNode;
+use cli::CliCommand;
+use csv_parser::CsvParser;
+use data::Db;
 use filter::Filter;
 
 peg_file! grammar("grammar.rustpeg");
@@ -38,14 +38,14 @@ fn main() {
     linenoise::history_set_max_len(1000);
     linenoise::history_load(".history");
 
-    let mut db = DB::new();
+    let mut db = Db::new();
     let mut pool = Pool::new(12);
 
     loop {
         println!("size: {}", db.datums.len());
         match cli::read() {
-            Ok(CLICommand::Query(query)) => {
-                match ASTNode::parse(&query) {
+            Ok(CliCommand::Query(query)) => {
+                match AstNode::parse(&query) {
                     Ok(ast) => {
                         println!("ast: {:?}", ast);
                         let start = time::precise_time_s();
@@ -57,10 +57,10 @@ fn main() {
                     Err(e) => println!("{:?}", e),
                 }
             }
-            Ok(CLICommand::Load(filename)) => {
+            Ok(CliCommand::Load(filename)) => {
                 let start = time::precise_time_s();
-                db = DB::new(); // de-alloc the old DB
-                match DB::from_file(&filename) {
+                db = Db::new(); // de-alloc the old Db
+                match Db::from_file(&filename) {
                     Ok(d) => {
                         db = d;
                         println!("duration: {}", time::precise_time_s() - start);
@@ -70,9 +70,9 @@ fn main() {
                     Err(e) => println!("{:?}", e),
                 }
             }
-            Ok(CLICommand::LoadCSV(filename, entity, time, joins)) => {
+            Ok(CliCommand::LoadCsv(filename, entity, time, joins)) => {
                 let start = time::precise_time_s();
-                let parser = CSVParser::new(&filename, &entity, &time, &joins);
+                let parser = CsvParser::new(&filename, &entity, &time, &joins);
 
                 match parser.parse(&db, &mut pool) {
                     Ok((datums, refs, offset)) => {
@@ -86,15 +86,15 @@ fn main() {
                     Err(e) => println!("{:?}", e),
                 }
             }
-            Ok(CLICommand::Write(filename)) => {
+            Ok(CliCommand::Write(filename)) => {
                 match db.write(&filename) {
                     Ok(_) => println!("wrote: {}", filename),
                     Err(e) => println!("{:?}", e),
                 }
             }
-            Ok(CLICommand::Empty) => db = DB::new(),
-            Ok(CLICommand::None) => continue,
-            Ok(CLICommand::Exit) => process::exit(0),
+            Ok(CliCommand::Empty) => db = Db::new(),
+            Ok(CliCommand::None) => continue,
+            Ok(CliCommand::Exit) => process::exit(0),
             Err(e) => println!("{:?}", e),
         }
     }

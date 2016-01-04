@@ -1,23 +1,23 @@
 use std::sync::mpsc::channel;
 use scoped_threadpool::Pool;
 
-use ast::{ASTNode, Comparator};
-use data::{Datum, DB, DBView};
+use ast::{AstNode, Comparator};
+use data::{Datum, Db, DbView};
 
 pub struct Filter<'a> {
-    db: &'a DB,
+    db: &'a Db,
     pool: &'a mut Pool,
 }
 
 impl<'a> Filter<'a> {
-    pub fn new(db: &'a DB, pool: &'a mut Pool) -> Filter<'a> {
+    pub fn new(db: &'a Db, pool: &'a mut Pool) -> Filter<'a> {
         Filter {
             db: db,
             pool: pool,
         }
     }
 
-    pub fn execute(self, ast: &ASTNode) -> DBView<'a> {
+    pub fn execute(self, ast: &AstNode) -> DbView<'a> {
         let plan = Plan::new(ast);
         let mut cache = Cache { executions: vec![] };
 
@@ -29,7 +29,7 @@ impl<'a> Filter<'a> {
             }
         }
 
-        DBView { datums: Self::run_step(self.db, self.pool, &cache, plan.steps.last().unwrap()) }
+        DbView { datums: Self::run_step(self.db, self.pool, &cache, plan.steps.last().unwrap()) }
     }
 
     fn translate_eids(&self, eids: Vec<usize>) -> Vec<usize> {
@@ -51,7 +51,7 @@ impl<'a> Filter<'a> {
             .collect()
     }
 
-    fn run_step(db: &'a DB, pool: &mut Pool, cache: &Cache, ast: &ASTNode) -> Vec<&'a Datum> {
+    fn run_step(db: &'a Db, pool: &mut Pool, cache: &Cache, ast: &AstNode) -> Vec<&'a Datum> {
         let db_size = db.datums.len();
         let threads = pool.thread_count() as usize;
         let size = db.datums.len() / threads;
@@ -91,23 +91,23 @@ impl<'a> Filter<'a> {
 }
 
 struct Plan {
-    steps: Vec<ASTNode>,
+    steps: Vec<AstNode>,
 }
 
 impl Plan {
-    fn new(ast: &ASTNode) -> Plan {
+    fn new(ast: &AstNode) -> Plan {
         Plan { steps: Self::expand(ast) }
     }
 
-    fn expand(ast: &ASTNode) -> Vec<ASTNode> {
+    fn expand(ast: &AstNode) -> Vec<AstNode> {
         match *ast {
-            ASTNode::Join(ref p, ref c) => {
+            AstNode::Join(ref p, ref c) => {
                 let mut expanded = Plan::expand(c);
                 let len = expanded.len();
-                expanded.push(ASTNode::CachedJoin(p.clone(), len - 1));
+                expanded.push(AstNode::CachedJoin(p.clone(), len - 1));
                 expanded
             }
-            ASTNode::Or(ref l, ref r) => {
+            AstNode::Or(ref l, ref r) => {
                 let mut expanded = Plan::expand(l);
                 expanded.append(&mut Plan::expand(r));
                 expanded
@@ -121,23 +121,23 @@ struct Cache {
     executions: Vec<Vec<usize>>,
 }
 
-fn eval(ast: &ASTNode, cache: &Cache, datum: &Datum) -> bool {
+fn eval(ast: &AstNode, cache: &Cache, datum: &Datum) -> bool {
     match *ast {
-        ASTNode::True => true,
-        ASTNode::Expression(ref preds) => {
+        AstNode::True => true,
+        AstNode::Expression(ref preds) => {
             test_predicate(&preds.e, datum.e) && test_predicate_with_contains(&preds.a, &datum.a) &&
             test_predicate_with_contains(&preds.v, &datum.v) &&
             test_predicate(&preds.t, datum.t)
         }
 
-        ASTNode::CachedJoin(ref preds, cache_idx) => {
+        AstNode::CachedJoin(ref preds, cache_idx) => {
             test_join_predicate(&preds.e, &cache.executions[cache_idx], datum.e) &&
             test_predicate_with_contains(&preds.a, &datum.a) &&
             test_predicate_with_contains(&preds.v, &datum.v) &&
             test_predicate(&preds.t, datum.t)
         }
-        ASTNode::Or(ref l, ref r) => eval(l, cache, datum) || eval(r, cache, datum),
-        ASTNode::Join(_, _) => unimplemented!(),
+        AstNode::Or(ref l, ref r) => eval(l, cache, datum) || eval(r, cache, datum),
+        AstNode::Join(_, _) => unimplemented!(),
     }
 }
 

@@ -1,18 +1,18 @@
-use ast::{ASTNode, Comparator};
+use ast::{AstNode, Comparator};
 
 #[pub]
-ast -> ASTNode
-  = __ e1:expr __ " | " __ e2:ast __ { ASTNode::Or(Box::new(e1), Box::new(e2)) }
+ast -> AstNode
+  = __ e1:expr __ " | " __ e2:ast __ { AstNode::Or(Box::new(e1), Box::new(e2)) }
   / __ e:expr __ { e }
-  / __ { ASTNode::True }
+  / __ { AstNode::True }
 
-expr -> ASTNode
-  = p:preds { ASTNode::from_parser(p) }
+expr -> AstNode
+  = p:preds { AstNode::from_parser(p) }
 
-preds -> Vec<(String, String, Option<ASTNode>, Comparator)>
+preds -> Vec<(String, String, Option<AstNode>, Comparator)>
   = p:pred ++ __ { p }
 
-pred -> (String, String, Option<ASTNode>, Comparator)
+pred -> (String, String, Option<AstNode>, Comparator)
   = "e:(" q:ast ")" { ("e".to_owned(), "".to_owned(), Some(q), Comparator::Contains) }
   / n:pred_name "=" v:pred_val { (n, v, None, Comparator::Equal) }
   / n:pred_name ">" v:pred_val { (n, v, None, Comparator::Greater) }

@@ -1,22 +1,22 @@
 use csv;
 use scoped_threadpool::Pool;
 
-use ast::ASTNode;
+use ast::AstNode;
 use cli::Join;
-use data::{Datum, DB, Ref, Error};
+use data::{Datum, Db, Ref, Error};
 use filter::Filter;
 
 #[derive(Debug)]
-pub struct CSVParser<'a> {
+pub struct CsvParser<'a> {
     filename: &'a str,
     entity: &'a str,
     time: &'a str,
     joins: &'a [Join],
 }
 
-impl<'a> CSVParser<'a> {
-    pub fn new(filename: &'a str, entity: &'a str, time: &'a str, joins: &'a [Join]) -> CSVParser<'a> {
-        CSVParser {
+impl<'a> CsvParser<'a> {
+    pub fn new(filename: &'a str, entity: &'a str, time: &'a str, joins: &'a [Join]) -> CsvParser<'a> {
+        CsvParser {
             filename: filename,
             entity: entity,
             time: time,
@@ -24,7 +24,7 @@ impl<'a> CSVParser<'a> {
         }
     }
 
-    pub fn parse(self, db: &DB, pool: &mut Pool) -> Result<(Vec<Datum>, Vec<Ref>, usize), Error> {
+    pub fn parse(self, db: &Db, pool: &mut Pool) -> Result<(Vec<Datum>, Vec<Ref>, usize), Error> {
         let mut rdr = try!(csv::Reader::from_file(self.filename));
         let headers = rdr.headers().expect("headers required to convert CSV");
 
@@ -40,7 +40,6 @@ impl<'a> CSVParser<'a> {
         let mut eid = db.offset;
         let datums_res = rdr.records()
                             .map(|row_res| {
-                                println!("row_res: {:?}", row_res);
                                 let row = row_res.unwrap();
                                 eid += 1;
                                 let datums = try!(Self::parse_row(row,
@@ -62,14 +61,14 @@ impl<'a> CSVParser<'a> {
     }
 
     // TODO: Sort both datasets first and do a streaming join
-    fn find_refs(&self, datums: &[Datum], db: &DB, pool: &mut Pool) -> Vec<Ref> {
+    fn find_refs(&self, datums: &[Datum], db: &Db, pool: &mut Pool) -> Vec<Ref> {
         self.joins
             .iter()
             .flat_map(|join| {
                 let (column, query) = (&join.0, &join.1);
                 let attribute = format!("{}/{}", self.entity, robotize(&column));
                 println!("before: {}", true);
-                let ast = ASTNode::parse(&query).unwrap();
+                let ast = AstNode::parse(&query).unwrap();
                 println!("after: {}", true);
 
                 let new_datums = datums.iter()
