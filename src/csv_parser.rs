@@ -3,7 +3,7 @@ use scoped_threadpool::Pool;
 
 use ast::ASTNode;
 use cli::Join;
-use data::{Datum, DB, Ref, LoadError};
+use data::{Datum, DB, Ref, Error};
 use filter::Filter;
 
 #[derive(Debug)]
@@ -24,13 +24,8 @@ impl<'a> CSVParser<'a> {
         }
     }
 
-    pub fn parse(self, db: &DB, pool: &mut Pool) -> Result<(Vec<Datum>, Vec<Ref>, usize), LoadError> {
-        let mut rdr = match csv::Reader::from_file(self.filename) {
-            Ok(rdr) => rdr,
-            Err(e) => {
-                return Err(LoadError::InvalidInput(format!("file: {}, err: {}", self.filename, e)))
-            }
-        };
+    pub fn parse(self, db: &DB, pool: &mut Pool) -> Result<(Vec<Datum>, Vec<Ref>, usize), Error> {
+        let mut rdr = try!(csv::Reader::from_file(self.filename));
         let headers = rdr.headers().expect("headers required to convert CSV");
 
         let time_index = match headers.iter()
@@ -38,13 +33,14 @@ impl<'a> CSVParser<'a> {
                                       .find(|&(_, h)| h == self.time) {
             Some((idx, _)) => idx,
             None => {
-                return Err(LoadError::InvalidInput(format!("time header not found: {}", self.time)))
+                return Err(Error::MissingTimeHeader(self.time.to_owned()))
             }
         };
 
         let mut eid = db.offset;
         let datums_res = rdr.records()
                             .map(|row_res| {
+                                println!("row_res: {:?}", row_res);
                                 let row = row_res.unwrap();
                                 eid += 1;
                                 let datums = try!(Self::parse_row(row,
@@ -54,7 +50,7 @@ impl<'a> CSVParser<'a> {
                                                                   self.entity));
                                 Ok(datums)
                             })
-                            .collect::<Result<Vec<Vec<Datum>>, LoadError>>();
+                            .collect::<Result<Vec<Vec<Datum>>, Error>>();
 
         let datums = match datums_res {
             Ok(d) => d.into_iter().flat_map(|v| v).collect::<Vec<Datum>>(),
@@ -72,7 +68,9 @@ impl<'a> CSVParser<'a> {
             .flat_map(|join| {
                 let (column, query) = (&join.0, &join.1);
                 let attribute = format!("{}/{}", self.entity, robotize(&column));
+                println!("before: {}", true);
                 let ast = ASTNode::parse(&query).unwrap();
+                println!("after: {}", true);
 
                 let new_datums = datums.iter()
                                        .filter(|d| d.a == attribute)
@@ -102,12 +100,11 @@ impl<'a> CSVParser<'a> {
     }
 
     fn parse_row(row: Vec<String>, headers: &[String], time_index: usize, eid: usize, entity: &str)
-                 -> Result<Vec<Datum>, LoadError> {
+                 -> Result<Vec<Datum>, Error> {
         let time = match row[time_index].parse::<usize>() {
             Ok(t) => t,
             Err(_) => {
-                return Err(LoadError::InvalidInput(format!("time col is not an int: {}",
-                                                           row[time_index])))
+                return Err(Error::TimeColumnTypeError(row[time_index].to_owned()))
             }
         };
         let datums = headers.iter()

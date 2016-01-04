@@ -1,13 +1,14 @@
-use std::fmt;
-use std::path;
-use std::fs::File;
-use std::io::{BufWriter, BufReader};
+use csv;
 use bincode;
 use bincode::SizeLimit;
 use bincode::rustc_serialize as serialize;
 use flate2::write::ZlibEncoder;
 use flate2::read::ZlibDecoder;
 use flate2::Compression;
+use std::fmt;
+use std::path;
+use std::fs::File;
+use std::io;
 
 #[derive(Debug, Clone, RustcEncodable, RustcDecodable, PartialEq)]
 pub struct Datum {
@@ -72,15 +73,13 @@ pub struct DBView<'a> {
 }
 
 #[derive(Debug)]
-pub enum LoadError {
-    FileMissing(String),
-    InvalidInput(String),
-}
-
-#[derive(Debug)]
-pub enum WriteError {
-    FileExists(String),
-    EncodingError(String),
+pub enum Error {
+    Io(io::Error),
+    Csv(csv::Error),
+    Encoding(serialize::EncodingError),
+    Decoding(serialize::DecodingError),
+    TimeColumnTypeError(String),
+    MissingTimeHeader(String),
 }
 
 impl DB {
@@ -92,35 +91,26 @@ impl DB {
         }
     }
 
-    pub fn from_file(filename: &str) -> Result<DB, LoadError> {
-        let file = match File::open(filename) {
-            Ok(f) => f,
-            Err(_) => return Err(LoadError::FileMissing(filename.to_owned())),
-        };
-        let reader = BufReader::new(file);
+    pub fn from_file(filename: &str) -> Result<DB, Error> {
+        let file = try!(File::open(filename));
+        let reader = io::BufReader::new(file);
         let mut decoder = ZlibDecoder::new(reader);
-        let decoded: Result<DB, serialize::DecodingError> =
-            serialize::decode_from(&mut decoder, SizeLimit::Infinite);
+        let decoded = try!(serialize::decode_from(&mut decoder, SizeLimit::Infinite));
 
-        match decoded {
-            Ok(db) => Ok(db),
-            Err(e) => Err(LoadError::InvalidInput(format!("file: {}, err: {}", filename, e))),
-        }
+        Ok(decoded)
     }
 
-    pub fn write(&self, filename: &str) -> Result<(), WriteError> {
+    pub fn write(&self, filename: &str) -> Result<(), Error> {
         let path = path::Path::new(filename);
         if path.exists() {
-            return Err(WriteError::FileExists(filename.to_owned()));
+            return Err(Error::Io(io::Error::new(io::ErrorKind::AlreadyExists, filename)))
         }
 
-        let writer = BufWriter::new(File::create(path).unwrap());
+        let writer = io::BufWriter::new(File::create(path).unwrap());
         let mut encoder = ZlibEncoder::new(writer, Compression::Fast);
 
-        match bincode::rustc_serialize::encode_into(self, &mut encoder, SizeLimit::Infinite) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(WriteError::EncodingError(format!("file: {}, err: {}", filename, e))),
-        }
+        try!(bincode::rustc_serialize::encode_into(self, &mut encoder, SizeLimit::Infinite));
+        Ok(())
     }
 }
 
@@ -156,4 +146,28 @@ fn display_datums<T>(datums: &[&T], f: &mut fmt::Formatter, size: usize) -> fmt:
         }
     }
     Ok(())
+}
+
+impl From<io::Error> for Error {
+    fn from(err: io::Error) -> Error {
+        Error::Io(err)
+    }
+}
+
+impl From<serialize::EncodingError> for Error {
+    fn from(err: serialize::EncodingError) -> Error {
+        Error::Encoding(err)
+    }
+}
+
+impl From<serialize::DecodingError> for Error {
+    fn from(err: serialize::DecodingError) -> Error {
+        Error::Decoding(err)
+    }
+}
+
+impl From<csv::Error> for Error {
+    fn from(err: csv::Error) -> Error {
+        Error::Csv(err)
+    }
 }
