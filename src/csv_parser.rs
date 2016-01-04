@@ -84,29 +84,29 @@ impl<'a> CsvParser<'a> {
         let index = index_by_value(old_datums);
 
         new_datums.iter()
-                  .flat_map(|new| {
-                      let new_entity = new.a.split('/').next().unwrap();
-
-                      match index.get(new.v.as_str()) {
-                          Some(old_matches) => {
-                              old_matches.iter()
-                                         .map(|old| {
-                                             let old_entity = old.a.split('/').next().unwrap();
-                                             Some(Ref::new(new.e,
-                                                           format!("{}/{}",
-                                                                   new_entity,
-                                                                   old_entity),
-                                                           old.e,
-                                                           new.t))
-                                         })
-                                         .collect()
-                          }
-                          None => vec![None],
-                      }
-                  })
+                  .flat_map(|new| Self::generate_refs(new, &index))
                   .filter(|o| o.is_some())
                   .map(|o| o.unwrap())
-                  .collect::<Vec<Ref>>()
+                  .collect()
+    }
+
+    fn generate_refs(new: &Datum, index: &HashMap<&str, Vec<&Datum>>) -> Vec<Option<Ref>> {
+        let new_entity = new.a.split('/').next().unwrap();
+
+        match index.get(new.v.as_str()) {
+            Some(old_matches) => {
+                old_matches.iter()
+                           .map(|old| {
+                               let old_entity = old.a.split('/').next().unwrap();
+                               Some(Ref::new(new.e,
+                                             format!("{}/{}", new_entity, old_entity),
+                                             old.e,
+                                             new.t))
+                           })
+                           .collect()
+            }
+            None => vec![None],
+        }
     }
 
     fn parse_row(row: Vec<String>, headers: &[String], time_index: usize, eid: usize, entity: &str)
