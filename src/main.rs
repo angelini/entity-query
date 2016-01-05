@@ -78,9 +78,7 @@ fn main() {
                 match parser.parse(&db, &mut pool) {
                     Ok((datums, refs, offset)) => {
                         println!("new: {}", datums.len());
-                        db.datums.extend(datums);
-                        db.refs.extend(refs);
-                        db.offset += offset;
+                        db.insert(datums, refs, offset);
                         println!("duration: {}", time::precise_time_s() - start);
                         println!("{}", db)
                     }

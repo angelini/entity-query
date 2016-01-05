@@ -114,6 +114,12 @@ impl Db {
         try!(bincode::rustc_serialize::encode_into(self, &mut encoder, SizeLimit::Infinite));
         Ok(())
     }
+
+    pub fn insert(&mut self, datums: Vec<Datum>, refs: Vec<Ref>, offset: usize) {
+        self.datums.extend(datums);
+        self.refs.extend(refs);
+        self.offset += offset;
+    }
 }
 
 impl fmt::Display for Db {
