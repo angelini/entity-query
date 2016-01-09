@@ -14,7 +14,7 @@ flate2 = "0.2"
 time = "0.1"
 scoped_threadpool = "0.1"
 peg = "0.3"
-clippy = "*"
+clippy = "0.0.33"
 
 [profile.release]
 debug = true
