@@ -196,32 +196,43 @@ mod tests {
     }
 
     #[test]
+    fn parse_or() {
+        let qs = ["e=1 | e=2", "e=1 a:foo   |  e=2"];
+
+        let e1 = Predicates::new(Some((1, Comparator::Equal)), None, None, None);
+        let e2 = Predicates::new(Some((2, Comparator::Equal)), None, None, None);
+        let e1afoo = Predicates::new(Some((1, Comparator::Equal)),
+                                     Some(("foo".to_owned(), Comparator::Contains)),
+                                     None,
+                                     None);
+
+        let asts = [AstNode::Or(Box::new(AstNode::Expression(e1)),
+                                Box::new(AstNode::Expression(e2.clone()))),
+                    AstNode::Or(Box::new(AstNode::Expression(e1afoo)),
+                                Box::new(AstNode::Expression(e2)))];
+
+        for (i, q) in qs.iter().enumerate() {
+            assert_eq!(asts[i], AstNode::parse(q).unwrap());
+        }
+    }
+
+    #[test]
     fn parse_joins() {
         let qs = ["e:(a=foo/bar v=baz)", " e:(e=1)  a:other t=1 "];
-        let asts = [AstNode::Join(Predicates {
-                                      e: Some((0, Comparator::Contains)),
-                                      a: None,
-                                      v: None,
-                                      t: None,
-                                  },
-                                  Box::new(AstNode::Expression(Predicates {
-                                      e: None,
-                                      a: Some(("foo/bar".to_owned(), Comparator::Equal)),
-                                      v: Some(("baz".to_owned(), Comparator::Equal)),
-                                      t: None,
-                                  }))),
-                    AstNode::Join(Predicates {
-                                      e: Some((0, Comparator::Contains)),
-                                      a: Some(("other".to_owned(), Comparator::Contains)),
-                                      v: None,
-                                      t: Some((1, Comparator::Equal)),
-                                  },
-                                  Box::new(AstNode::Expression(Predicates {
-                                      e: Some((1, Comparator::Equal)),
-                                      a: None,
-                                      v: None,
-                                      t: None,
-                                  })))];
+
+        let e0 = Predicates::new(Some((0, Comparator::Contains)), None, None, None);
+        let e1 = Predicates::new(Some((1, Comparator::Equal)), None, None, None);
+        let e0aothert1 = Predicates::new(Some((0, Comparator::Contains)),
+                                         Some(("other".to_owned(), Comparator::Contains)),
+                                         None,
+                                         Some((1, Comparator::Equal)));
+        let afoovbaz = Predicates::new(None,
+                                       Some(("foo/bar".to_owned(), Comparator::Equal)),
+                                       Some(("baz".to_owned(), Comparator::Equal)),
+                                       None);
+
+        let asts = [AstNode::Join(e0, Box::new(AstNode::Expression(afoovbaz))),
+                    AstNode::Join(e0aothert1, Box::new(AstNode::Expression(e1)))];
 
         for (i, q) in qs.iter().enumerate() {
             assert_eq!(asts[i], AstNode::parse(q).unwrap());
@@ -231,27 +242,24 @@ mod tests {
     #[test]
     fn parse_nested_joins() {
         let q = "e:(e:(a=foo/bar v=baz) a:inside t>10) a:other";
-        let ast =
-            AstNode::Join(Predicates {
-                              e: Some((0, Comparator::Contains)),
-                              a: Some(("other".to_owned(), Comparator::Contains)),
-                              v: None,
-                              t: None,
-                          },
-                          Box::new(AstNode::Join(Predicates {
-                                                     e: Some((0, Comparator::Contains)),
-                                                     a: Some(("inside".to_owned(),
-                                                              Comparator::Contains)),
-                                                     v: None,
-                                                     t: Some((10, Comparator::Greater)),
-                                                 },
-                                                 Box::new(AstNode::Expression(Predicates {
-                                                     e: None,
-                                                     a: Some(("foo/bar".to_owned(),
-                                                              Comparator::Equal)),
-                                                     v: Some(("baz".to_owned(), Comparator::Equal)),
-                                                     t: None,
-                                                 })))));
+
+        let e0aother = Predicates::new(Some((0, Comparator::Contains)),
+                                       Some(("other".to_owned(), Comparator::Contains)),
+                                       None,
+                                       None);
+        let e0ainsidet10 = Predicates::new(Some((0, Comparator::Contains)),
+                                           Some(("inside".to_owned(), Comparator::Contains)),
+                                           None,
+                                           Some((10, Comparator::Greater)));
+        let afoovbaz = Predicates::new(None,
+                                       Some(("foo/bar".to_owned(), Comparator::Equal)),
+                                       Some(("baz".to_owned(), Comparator::Equal)),
+                                       None);
+
+
+        let ast = AstNode::Join(e0aother,
+                                Box::new(AstNode::Join(e0ainsidet10,
+                                                       Box::new(AstNode::Expression(afoovbaz)))));
 
         assert_eq!(ast, AstNode::parse(q).unwrap());
     }

@@ -2,7 +2,7 @@ use ast::{AstNode, Comparator};
 
 #[pub]
 ast -> AstNode
-  = __ e1:expr __ " | " __ e2:ast __ { AstNode::Or(Box::new(e1), Box::new(e2)) }
+  = __ e1:expr __ "|" __ e2:ast __ { AstNode::Or(Box::new(e1), Box::new(e2)) }
   / __ e:expr __ { e }
   / __ { AstNode::True }
 
