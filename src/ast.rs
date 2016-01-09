@@ -42,6 +42,19 @@ pub struct Predicates {
     pub t: Option<(usize, Comparator)>,
 }
 
+impl Predicates {
+    pub fn new(e: Option<(usize, Comparator)>, a: Option<(String, Comparator)>,
+               v: Option<(String, Comparator)>, t: Option<(usize, Comparator)>)
+               -> Predicates {
+        Predicates {
+            e: e,
+            a: a,
+            v: v,
+            t: t,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum AstNode {
     True,

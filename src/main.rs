@@ -21,6 +21,7 @@ extern crate scoped_threadpool;
 mod data;
 mod ast;
 mod cli;
+mod plan;
 mod filter;
 mod csv_parser;
 
@@ -32,6 +33,7 @@ use cli::CliCommand;
 use csv_parser::CsvParser;
 use data::Db;
 use filter::Filter;
+use plan::NewPlan;
 
 peg_file! grammar("grammar.rustpeg");
 
@@ -48,6 +50,7 @@ fn main() {
             Ok(CliCommand::Query(query)) => {
                 match AstNode::parse(&query) {
                     Ok(ast) => {
+                        println!("new_plan: {:?}", NewPlan::new(&ast));
                         println!("ast: {:?}", ast);
                         let start = time::precise_time_s();
                         let res = Filter::new(&db, &mut pool).execute(&ast);
