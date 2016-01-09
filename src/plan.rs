@@ -9,13 +9,13 @@ pub enum IndexedNode {
 }
 
 #[derive(Debug)]
-pub struct NewPlan {
+pub struct Plan {
     tasks: HashMap<usize, IndexedNode>,
     stages: Vec<Vec<usize>>,
 }
 
-impl NewPlan {
-    pub fn new(ast: &AstNode) -> NewPlan {
+impl Plan {
+    pub fn new(ast: &AstNode) -> Plan {
         let mut stages: Vec<Vec<usize>> = vec![vec![]];
         let mut tasks = HashMap::new();
         let nodes = split_nodes(ast)
@@ -33,7 +33,7 @@ impl NewPlan {
                     let child_idx = find_stage_idx(&stages, c);
                     let stage_idx = child_idx + 1;
 
-                    if stages.len() < stage_idx - 1 {
+                    if stages.len() < stage_idx + 1 {
                         stages.push(vec![]);
                     }
                     stages[stage_idx].push(id);
@@ -43,7 +43,7 @@ impl NewPlan {
                     let right_idx = find_stage_idx(&stages, r);
                     let stage_idx = if left_idx > right_idx { left_idx + 1 } else { right_idx + 1 };
 
-                    if stages.len() < stage_idx - 1 {
+                    if stages.len() < stage_idx + 1 {
                         stages.push(vec![]);
                     }
                     stages[stage_idx].push(id);
@@ -53,7 +53,7 @@ impl NewPlan {
             tasks.insert(id, indexed);
         }
 
-        NewPlan {
+        Plan {
             tasks: tasks,
             stages: stages,
         }
@@ -108,4 +108,31 @@ fn split_nodes(ast: &AstNode) -> Vec<&AstNode> {
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Plan;
+    use ast::AstNode;
+
+    #[test]
+    fn base_query() {
+        let ast = AstNode::parse("e=1").unwrap();
+        let plan = Plan::new(&ast);
+        assert_eq!(vec![vec![0]], plan.stages)
+    }
+
+    #[test]
+    fn or_query() {
+        let ast = AstNode::parse("e=1 | e=2").unwrap();
+        let plan = Plan::new(&ast);
+        assert_eq!(vec![vec![0, 1], vec![2]], plan.stages)
+    }
+
+    #[test]
+    fn or_join_query() {
+        let ast = AstNode::parse("e:(e=1) | e:(e=2)").unwrap();
+        let plan = Plan::new(&ast);
+        assert_eq!(vec![vec![0, 2], vec![1, 3], vec![4]], plan.stages)
+    }
 }
