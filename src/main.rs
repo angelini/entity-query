@@ -17,12 +17,14 @@ extern crate linenoise;
 extern crate flate2;
 extern crate time;
 extern crate scoped_threadpool;
+extern crate rayon;
 
 mod data;
 mod ast;
 mod cli;
 mod plan;
 mod filter;
+mod exec;
 mod csv_parser;
 
 use std::process;

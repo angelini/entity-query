@@ -1,17 +1,26 @@
 use std::collections::HashMap;
 use ast::{AstNode, Predicates};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum IndexedNode {
     Base(Predicates),
     Or(usize, usize),
     Join(Predicates, usize),
 }
 
+#[derive(Debug, Clone)]
+pub enum Action {
+    Collect,
+    Tag,
+}
+
+#[derive(Debug, Clone)]
+pub struct Task(pub IndexedNode, pub Action);
+
 #[derive(Debug)]
 pub struct Plan {
-    tasks: HashMap<usize, IndexedNode>,
-    stages: Vec<Vec<usize>>,
+    pub tasks: HashMap<usize, Task>,
+    pub stages: Vec<Vec<usize>>,
 }
 
 impl Plan {
@@ -50,7 +59,8 @@ impl Plan {
                 }
             }
 
-            tasks.insert(id, indexed);
+            // FIXME: Add support for Action::Collect
+            tasks.insert(id, Task(indexed, Action::Tag));
         }
 
         Plan {

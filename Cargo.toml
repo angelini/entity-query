@@ -12,6 +12,7 @@ csv = "0.14"
 linenoise-rust = "0.1"
 flate2 = "0.2"
 time = "0.1"
+rayon = { git = "https://github.com/nikomatsakis/rayon" }
 scoped_threadpool = "0.1"
 peg = "0.3"
 clippy = "0.0.33"
