@@ -1,3 +1,10 @@
 target
 Cargo.lock
 .history
+data/*
+!data/gdp.csv
+!data/gdp.db
+!data/music.db
+!data/artists.csv
+!data/albums.csv
+!data/tracks.csv
